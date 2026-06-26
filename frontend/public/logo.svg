@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6C63FF"/>
+      <stop offset="100%" style="stop-color:#3ECFCF"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#6C63FF" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <!-- App icon rounded rect -->
+  <rect width="256" height="256" rx="56" fill="url(#bg)" filter="url(#shadow)"/>
+  <!-- Chat bubble -->
+  <path d="M44 68 Q44 44 68 44 L188 44 Q212 44 212 68 L212 152 Q212 176 188 176 L152 176 L128 212 L128 176 L68 176 Q44 176 44 152 Z" fill="white" opacity="0.95"/>
+  <!-- CK text -->
+  <text x="128" y="122" font-family="Arial,sans-serif" font-weight="900" font-size="60" fill="#6C63FF" text-anchor="middle" dominant-baseline="middle">CK</text>
+</svg>

@@ -1,9 +1,9 @@
-export const APP_NAME = "iMessage";
+export const APP_NAME = "ChatKoro";
 
 export function AppLogo({ className = "", size = 32, alt = APP_NAME }) {
   return (
     <img
-      src="/logo.png"
+      src="/logo.svg"
       alt={alt}
       width={size}
       height={size}
