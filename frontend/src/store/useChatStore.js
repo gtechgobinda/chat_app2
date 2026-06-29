@@ -150,6 +150,29 @@ export const useChatStore = create(
         }
       },
 
+      deleteMessage: async (messageId, scope) => {
+        try {
+          await axiosInstance.delete(`/messages/${messageId}`, { data: { scope } });
+          if (scope === "everyone") {
+            set((state) => ({
+              messages: state.messages.map((m) =>
+                String(m._id) === String(messageId)
+                  ? { ...m, deletedForEveryone: true, text: null, image: null, video: null }
+                  : m,
+              ),
+            }));
+          } else {
+            set((state) => ({
+              messages: state.messages.filter((m) => String(m._id) !== String(messageId)),
+            }));
+          }
+          return true;
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to delete message");
+          return false;
+        }
+      },
+
       editMessage: async (messageId, newText) => {
         try {
           const res = await axiosInstance.patch(`/messages/${messageId}`, { text: newText });
@@ -252,6 +275,17 @@ export const useChatStore = create(
             ),
           }));
         });
+
+        socket.off("messageDeleted");
+        socket.on("messageDeleted", ({ messageId }) => {
+          set((state) => ({
+            messages: state.messages.map((m) =>
+              String(m._id) === String(messageId)
+                ? { ...m, deletedForEveryone: true, text: null, image: null, video: null }
+                : m,
+            ),
+          }));
+        });
       },
 
       unsubscribeFromMessages: () => {
@@ -262,6 +296,7 @@ export const useChatStore = create(
         socket?.off("messageDelivered");
         socket?.off("messagesRead");
         socket?.off("messageEdited");
+        socket?.off("messageDeleted");
       },
 
       markMessagesAsRead: (senderId) => {

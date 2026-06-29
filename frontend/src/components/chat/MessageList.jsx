@@ -7,6 +7,7 @@ import { useChatStore } from "../../store/useChatStore";
 export function MessageList() {
   const { activeConversation, activeConversationId } = useSelectedConversation();
   const editMessage = useChatStore((state) => state.editMessage);
+  const deleteMessage = useChatStore((state) => state.deleteMessage);
 
   const lastMessageId = activeConversation?.messages.at(-1)?.id;
   const messagesScrollRef = useScrollToBottom(activeConversationId, lastMessageId);
@@ -22,7 +23,7 @@ export function MessageList() {
             Today
           </p>
           {activeConversation.messages.map((message) => (
-            <MessageBubble key={message.id} message={message} onEdit={editMessage} />
+            <MessageBubble key={message.id} message={message} onEdit={editMessage} onDelete={deleteMessage} />
           ))}
         </div>
       ) : (

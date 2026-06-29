@@ -9,6 +9,7 @@ import {
   unmuteConversation,
   getMessages,
   editMessage,
+  deleteMessage,
   getUsersForSidebar,
   sendMessage,
 } from "../controllers/message.controller.js";
@@ -29,6 +30,7 @@ router.post("/mute/:id", muteConversation);
 router.delete("/mute/:id", unmuteConversation);
 router.get("/:id", getMessages);
 router.patch("/:id", editMessage);
+router.delete("/:id", deleteMessage);
 router.post("/send/:id", upload.single("media"), sendMessage);
 
 export default router;

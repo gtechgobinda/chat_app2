@@ -31,6 +31,7 @@ function mapUserToConversation({ user, messages, authUser, onlineUsers }) {
       videoUrl: message.video,
       status,
       isEdited: Boolean(message.editedAt),
+      isDeletedForEveryone: Boolean(message.deletedForEveryone),
       createdAt: message.createdAt,
     };
   });

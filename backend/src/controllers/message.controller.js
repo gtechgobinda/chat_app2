@@ -181,7 +181,9 @@ export async function getMessages(req, res) {
           ],
         };
 
-    const messages = await Message.find(query).sort({ createdAt: 1 });
+    const messages = await Message.find({
+      $and: [query, { deletedFor: { $nin: [myId] } }],
+    }).sort({ createdAt: 1 });
 
     // Mark messages from the other user as delivered since receiver is now fetching them
     if (!iHaveBlocked) {
@@ -217,7 +219,53 @@ export async function getMessages(req, res) {
   }
 }
 
-const EDIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const EDIT_WINDOW_MS = 15 * 60 * 1000;
+
+export async function deleteMessage(req, res) {
+  try {
+    const { id: messageId } = req.params;
+    const { scope } = req.body; // "me" | "everyone"
+    const userId = req.user._id;
+
+    const message = await Message.findById(messageId);
+    if (!message) return res.status(404).json({ message: "Message not found" });
+
+    const isOwner = String(message.senderId) === String(userId);
+    const isParticipant =
+      isOwner || String(message.receiverId) === String(userId);
+
+    if (!isParticipant) {
+      return res.status(403).json({ message: "Not authorised" });
+    }
+
+    if (scope === "everyone") {
+      if (!isOwner) {
+        return res.status(403).json({ message: "Only the sender can delete for everyone" });
+      }
+      message.deletedForEveryone = true;
+      message.text = null;
+      message.image = null;
+      message.video = null;
+      await message.save();
+
+      const receiverSocketId = getReceiverSocketId(message.receiverId);
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("messageDeleted", { messageId: message._id });
+      }
+    } else {
+      // "me" — add caller to deletedFor list
+      await Message.updateOne(
+        { _id: messageId },
+        { $addToSet: { deletedFor: userId } },
+      );
+    }
+
+    res.status(200).json({ message: "Message deleted" });
+  } catch (error) {
+    console.error("Error in deleteMessage:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
 
 export async function editMessage(req, res) {
   try {
