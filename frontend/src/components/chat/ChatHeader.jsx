@@ -23,7 +23,7 @@ export function ChatHeader() {
   const setActiveConversationId = useChatStore((state) => state.setActiveConversationId);
   const setSoundEnabled = useChatStore((state) => state.setSoundEnabled);
   const typingUsers = useChatStore((state) => state.typingUsers);
-  const isConversationMuted = useChatStore((state) => state.isConversationMuted);
+  const mutedConversations = useChatStore((state) => state.mutedConversations);
   const muteConversation = useChatStore((state) => state.muteConversation);
   const unmuteConversation = useChatStore((state) => state.unmuteConversation);
 
@@ -32,7 +32,13 @@ export function ChatHeader() {
   const [muteMenuOpen, setMuteMenuOpen] = useState(false);
   const muteMenuRef = useRef(null);
 
-  const isMuted = activeConversationId ? isConversationMuted(activeConversationId) : false;
+  const isMuted = (() => {
+    if (!activeConversationId) return false;
+    const entry = mutedConversations.find((m) => String(m.userId) === String(activeConversationId));
+    if (!entry) return false;
+    if (entry.mutedUntil === null) return true;
+    return new Date(entry.mutedUntil) > new Date();
+  })();
 
   useEffect(() => {
     if (!muteMenuOpen) return;

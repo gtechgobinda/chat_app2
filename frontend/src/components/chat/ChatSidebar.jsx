@@ -34,7 +34,14 @@ function ChatSidebar() {
   const archivedConversations = useChatStore((state) => state.archivedConversations);
   const archiveConversation = useChatStore((state) => state.archiveConversation);
   const unarchiveConversation = useChatStore((state) => state.unarchiveConversation);
-  const isConversationMuted = useChatStore((state) => state.isConversationMuted);
+  const mutedConversations = useChatStore((state) => state.mutedConversations);
+
+  function isConversationMuted(userId) {
+    const entry = mutedConversations.find((m) => String(m.userId) === String(userId));
+    if (!entry) return false;
+    if (entry.mutedUntil === null) return true;
+    return new Date(entry.mutedUntil) > new Date();
+  }
   const users = useChatStore((state) => state.users);
 
   const searchQuery = useChatStore((state) => state.searchQuery);
