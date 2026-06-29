@@ -19,31 +19,93 @@ export async function getUsersForSidebar(req, res) {
 export async function getConversationsForSidebar(req, res) {
   try {
     const loggedInUserId = req.user._id;
+    const archivedIds = req.user.archivedConversations || [];
 
     const conversations = await Message.aggregate([
-      // 1. Keep only the messages I sent or received.
       { $match: { $or: [{ senderId: loggedInUserId }, { receiverId: loggedInUserId }] } },
-      // 2. Collapse them into one row per chat partner, noting our latest message time.
       {
         $group: {
-          // The partner is the other person on the message (not me).
           _id: { $cond: [{ $eq: ["$senderId", loggedInUserId] }, "$receiverId", "$senderId"] },
           lastMessageAt: { $max: "$createdAt" },
         },
       },
-      // 3. Put the most recent conversation at the top.
+      // Exclude archived conversation partners
+      { $match: { _id: { $nin: archivedIds } } },
       { $sort: { lastMessageAt: -1 } },
-      // 4. Look up each partner's user profile (comes back as an array).
       { $lookup: { from: "users", localField: "_id", foreignField: "_id", as: "user" } },
-      // 5. Pull that profile out of the array and make it the document.
       { $replaceRoot: { newRoot: { $first: "$user" } } },
-      // 6. Hide the private clerkId field from the result.
       { $project: { clerkId: 0 } },
     ]);
 
     res.status(200).json(conversations);
   } catch (error) {
     console.error("Error in getConversationsForSidebar:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+export async function getArchivedConversations(req, res) {
+  try {
+    const loggedInUserId = req.user._id;
+    const archivedIds = req.user.archivedConversations || [];
+
+    if (archivedIds.length === 0) {
+      return res.status(200).json([]);
+    }
+
+    const conversations = await Message.aggregate([
+      { $match: { $or: [{ senderId: loggedInUserId }, { receiverId: loggedInUserId }] } },
+      {
+        $group: {
+          _id: { $cond: [{ $eq: ["$senderId", loggedInUserId] }, "$receiverId", "$senderId"] },
+          lastMessageAt: { $max: "$createdAt" },
+        },
+      },
+      // Only include archived conversation partners
+      { $match: { _id: { $in: archivedIds } } },
+      { $sort: { lastMessageAt: -1 } },
+      { $lookup: { from: "users", localField: "_id", foreignField: "_id", as: "user" } },
+      { $replaceRoot: { newRoot: { $first: "$user" } } },
+      { $project: { clerkId: 0 } },
+    ]);
+
+    res.status(200).json(conversations);
+  } catch (error) {
+    console.error("Error in getArchivedConversations:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+export async function archiveConversation(req, res) {
+  try {
+    const { id: targetUserId } = req.params;
+    const loggedInUserId = req.user._id;
+
+    await User.updateOne(
+      { _id: loggedInUserId },
+      { $addToSet: { archivedConversations: targetUserId } },
+    );
+
+    res.status(200).json({ message: "Conversation archived" });
+  } catch (error) {
+    console.error("Error in archiveConversation:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+export async function unarchiveConversation(req, res) {
+  try {
+    const { id: targetUserId } = req.params;
+    const loggedInUserId = req.user._id;
+
+    await User.updateOne(
+      { _id: loggedInUserId },
+      { $pull: { archivedConversations: targetUserId } },
+    );
+
+    res.status(200).json({ message: "Conversation unarchived" });
+  } catch (error) {
+    console.error("Error in unarchiveConversation:", error.message);
     res.status(500).json({ message: "Internal server error" });
   }
 }
@@ -146,6 +208,14 @@ export async function sendMessage(req, res) {
     });
 
     await newMessage.save();
+
+    // Auto-unarchive: if receiver had this sender archived, move them back to the main list
+    if (!senderIsBlockedByReceiver) {
+      await User.updateOne(
+        { _id: receiverId, archivedConversations: senderId },
+        { $pull: { archivedConversations: senderId } },
+      );
+    }
 
     // Only deliver if the receiver has not blocked the sender
     if (!senderIsBlockedByReceiver) {

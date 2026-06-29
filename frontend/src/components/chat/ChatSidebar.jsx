@@ -7,7 +7,7 @@ import { APP_NAME, AppLogo } from "../AppLogo";
 import { UserButton } from "@clerk/react";
 
 import { Badge, SearchField, Tabs } from "@heroui/react";
-import { BellIcon, MessageSquareIcon, UsersIcon } from "lucide-react";
+import { ArchiveIcon, BellIcon, ChevronDownIcon, ChevronRightIcon, MessageSquareIcon, UsersIcon } from "lucide-react";
 import { ConversationRow } from "./ConversationRow";
 import { FriendRequestRow } from "./FriendRequestRow";
 import { UserWithStatusRow } from "./UserWithStatusRow";
@@ -31,6 +31,9 @@ function mapUserForList(user, onlineUsers) {
 
 function ChatSidebar() {
   const conversations = useChatStore((state) => state.conversations);
+  const archivedConversations = useChatStore((state) => state.archivedConversations);
+  const archiveConversation = useChatStore((state) => state.archiveConversation);
+  const unarchiveConversation = useChatStore((state) => state.unarchiveConversation);
   const users = useChatStore((state) => state.users);
 
   const searchQuery = useChatStore((state) => state.searchQuery);
@@ -40,6 +43,8 @@ function ChatSidebar() {
   const setSidebarTab = useChatStore((state) => state.setSidebarTab);
 
   const setActiveConversationId = useChatStore((state) => state.setActiveConversationId);
+
+  const [archivedExpanded, setArchivedExpanded] = useState(false);
 
   const onlineUsers = useAuthStore((state) => state.onlineUsers);
   const authUser = useAuthStore((state) => state.authUser);
@@ -73,6 +78,12 @@ function ChatSidebar() {
   const filteredConversations = normalizedSearchQuery
     ? conversationUsers.filter((c) => c.peer.name.toLowerCase().includes(normalizedSearchQuery))
     : conversationUsers;
+
+  const archivedUsers = archivedConversations.map((user) => mapUserForList(user, onlineUsers));
+
+  const filteredArchived = normalizedSearchQuery
+    ? archivedUsers.filter((c) => c.peer.name.toLowerCase().includes(normalizedSearchQuery))
+    : archivedUsers;
 
   const filteredUsers = normalizedSearchQuery
     ? users.filter((u) => u.fullName.toLowerCase().includes(normalizedSearchQuery))
@@ -170,21 +181,56 @@ function ChatSidebar() {
         </Tabs.ListContainer>
 
         <Tabs.Panel id="chats" className="flex-1 overflow-x-hidden overflow-y-auto outline-none">
-          {filteredConversations.length === 0 ? (
+          {filteredConversations.length === 0 && filteredArchived.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-muted">
               {normalizedSearchQuery
                 ? "No conversations match your search."
                 : "No conversations yet. Add friends to start chatting!"}
             </p>
           ) : (
-            filteredConversations.map((conversation) => (
-              <ConversationRow
-                key={conversation.id}
-                user={conversation}
-                selected={conversation.id === activeConversationId}
-                onSelect={() => setActiveConversationId(conversation.id)}
-              />
-            ))
+            <>
+              {filteredConversations.map((conversation) => (
+                <ConversationRow
+                  key={conversation.id}
+                  user={conversation}
+                  selected={conversation.id === activeConversationId}
+                  onSelect={() => setActiveConversationId(conversation.id)}
+                  onArchive={archiveConversation}
+                />
+              ))}
+
+              {filteredArchived.length > 0 && (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setArchivedExpanded((v) => !v)}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted hover:text-foreground"
+                  >
+                    {archivedExpanded ? (
+                      <ChevronDownIcon className="size-3.5" />
+                    ) : (
+                      <ChevronRightIcon className="size-3.5" />
+                    )}
+                    <ArchiveIcon className="size-3.5" />
+                    Archived
+                    <span className="ml-auto rounded-full bg-muted/40 px-1.5 py-0.5 text-[10px] font-bold">
+                      {filteredArchived.length}
+                    </span>
+                  </button>
+
+                  {archivedExpanded &&
+                    filteredArchived.map((conversation) => (
+                      <ConversationRow
+                        key={conversation.id}
+                        user={conversation}
+                        selected={conversation.id === activeConversationId}
+                        onSelect={() => setActiveConversationId(conversation.id)}
+                        onUnarchive={unarchiveConversation}
+                      />
+                    ))}
+                </div>
+              )}
+            </>
           )}
         </Tabs.Panel>
 

@@ -1,6 +1,9 @@
 import express from "express";
 import {
   getConversationsForSidebar,
+  getArchivedConversations,
+  archiveConversation,
+  unarchiveConversation,
   getMessages,
   getUsersForSidebar,
   sendMessage,
@@ -14,6 +17,9 @@ router.use(protectRoute);
 
 router.get("/users", getUsersForSidebar);
 router.get("/conversations", getConversationsForSidebar);
+router.get("/archived", getArchivedConversations);
+router.post("/archive/:id", archiveConversation);
+router.delete("/archive/:id", unarchiveConversation);
 router.get("/:id", getMessages);
 router.post("/send/:id", upload.single("media"), sendMessage);
 

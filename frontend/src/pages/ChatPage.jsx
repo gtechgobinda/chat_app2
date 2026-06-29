@@ -11,6 +11,7 @@ function ChatPage() {
   const { frameStyle } = useWallpaper();
 
   const getConversations = useChatStore((state) => state.getConversations);
+  const getArchivedConversations = useChatStore((state) => state.getArchivedConversations);
   const getMessages = useChatStore((state) => state.getMessages);
   const getUsers = useChatStore((state) => state.getUsers);
   const subscribeToMessages = useChatStore((state) => state.subscribeToMessages);
@@ -21,7 +22,8 @@ function ChatPage() {
   useEffect(() => {
     getUsers();
     getConversations();
-  }, [getConversations, getUsers]);
+    getArchivedConversations();
+  }, [getConversations, getArchivedConversations, getUsers]);
 
   useEffect(() => {
     if (!activeConversationId) return;

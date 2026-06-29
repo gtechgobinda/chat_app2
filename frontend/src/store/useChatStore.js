@@ -10,6 +10,7 @@ export const useChatStore = create(
     (set, get) => ({
       users: [],
       conversations: [],
+      archivedConversations: [],
       messages: [],
       selectedUser: null,
       isConversationsLoading: false,
@@ -53,6 +54,33 @@ export const useChatStore = create(
         }
       },
 
+      getArchivedConversations: async () => {
+        try {
+          const res = await axiosInstance.get("/messages/archived");
+          set({ archivedConversations: res.data });
+        } catch (error) {
+          console.log("Error in getArchivedConversations", error.message);
+        }
+      },
+
+      archiveConversation: async (userId) => {
+        try {
+          await axiosInstance.post(`/messages/archive/${userId}`);
+          await Promise.all([get().getConversations(), get().getArchivedConversations()]);
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to archive conversation");
+        }
+      },
+
+      unarchiveConversation: async (userId) => {
+        try {
+          await axiosInstance.delete(`/messages/archive/${userId}`);
+          await Promise.all([get().getConversations(), get().getArchivedConversations()]);
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to unarchive conversation");
+        }
+      },
+
       getMessages: async (userId) => {
         if (!userId) return;
         set({ isMessagesLoading: true });
@@ -91,6 +119,10 @@ export const useChatStore = create(
 
         socket.off("newMessage");
         socket.on("newMessage", (newMessage) => {
+          // Always refresh conversation lists so archived auto-unarchive is reflected
+          get().getConversations();
+          get().getArchivedConversations();
+
           // if im not the receiver don't do anything just return
           if (String(newMessage.senderId) !== String(userId)) return;
 
@@ -99,8 +131,6 @@ export const useChatStore = create(
           set((state) => ({ typingUsers: { ...state.typingUsers, [userId]: false } }));
           // Mark as read since we're actively in this conversation
           get().markMessagesAsRead(userId);
-
-          get().getConversations();
         });
 
         socket.off("typing");
