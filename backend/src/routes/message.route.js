@@ -10,6 +10,7 @@ import {
   getMessages,
   editMessage,
   deleteMessage,
+  reactToMessage,
   pinMessage,
   unpinMessage,
   getUsersForSidebar,
@@ -33,6 +34,7 @@ router.delete("/mute/:id", unmuteConversation);
 router.get("/:id", getMessages);
 router.patch("/:id", editMessage);
 router.delete("/:id", deleteMessage);
+router.post("/:id/reaction", reactToMessage);
 router.post("/:id/pin", pinMessage);
 router.delete("/:id/pin", unpinMessage);
 router.post("/send/:id", upload.single("media"), sendMessage);

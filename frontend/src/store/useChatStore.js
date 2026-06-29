@@ -150,6 +150,19 @@ export const useChatStore = create(
         }
       },
 
+      reactToMessage: async (messageId, emoji) => {
+        try {
+          const res = await axiosInstance.post(`/messages/${messageId}/reaction`, { emoji });
+          set((state) => ({
+            messages: state.messages.map((m) =>
+              String(m._id) === String(messageId) ? { ...m, reactions: res.data.reactions } : m,
+            ),
+          }));
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to add reaction");
+        }
+      },
+
       pinMessage: async (messageId) => {
         try {
           await axiosInstance.post(`/messages/${messageId}/pin`);
@@ -336,6 +349,15 @@ export const useChatStore = create(
             ),
           }));
         });
+
+        socket.off("messageReaction");
+        socket.on("messageReaction", ({ messageId, reactions }) => {
+          set((state) => ({
+            messages: state.messages.map((m) =>
+              String(m._id) === String(messageId) ? { ...m, reactions } : m,
+            ),
+          }));
+        });
       },
 
       unsubscribeFromMessages: () => {
@@ -349,6 +371,7 @@ export const useChatStore = create(
         socket?.off("messageDeleted");
         socket?.off("messagePinned");
         socket?.off("messageUnpinned");
+        socket?.off("messageReaction");
       },
 
       markMessagesAsRead: (senderId) => {

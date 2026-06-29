@@ -33,6 +33,12 @@ function mapUserToConversation({ user, messages, authUser, onlineUsers }) {
       isEdited: Boolean(message.editedAt),
       isDeletedForEveryone: Boolean(message.deletedForEveryone),
       isPinned: Boolean(message.isPinned),
+      reactions: (message.reactions || []).map((r) => ({
+        userId: String(r.userId),
+        emoji: r.emoji,
+      })),
+      myReaction:
+        message.reactions?.find((r) => String(r.userId) === String(authUser?._id))?.emoji ?? null,
       createdAt: message.createdAt,
     };
   });

@@ -1,10 +1,24 @@
 import { useEffect, useRef, useState } from "react";
-import { PencilIcon, PinIcon, PinOffIcon, TrashIcon } from "lucide-react";
+import { PencilIcon, PinIcon, PinOffIcon, SmilePlusIcon, TrashIcon } from "lucide-react";
 import { withTransform } from "../../lib/imagekit";
 import { MessageVideo } from "./MessageVideo";
 
 const IMAGE_TRANSFORM = "q-auto,w-640,f-auto";
 const EDIT_WINDOW_MS = 15 * 60 * 1000;
+const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
+
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+function groupReactions(reactions) {
+  const map = new Map();
+  for (const { emoji, userId } of reactions) {
+    if (!map.has(emoji)) map.set(emoji, []);
+    map.get(emoji).push(userId);
+  }
+  return [...map.entries()]; // [[emoji, [userId, ...]], ...]
+}
+
+// ─── sub-components ─────────────────────────────────────────────────────────
 
 function MessageTicks({ status }) {
   const isRead = status === "read";
@@ -18,7 +32,6 @@ function MessageTicks({ status }) {
       </svg>
     );
   }
-
   return (
     <svg className="ml-1 inline-block shrink-0" width="18" height="10" viewBox="0 0 18 10" fill="none">
       <path d="M1 5L4.5 8.5L12 1" stroke={tickColor} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" opacity={isRead ? 1 : 0.75} />
@@ -27,15 +40,49 @@ function MessageTicks({ status }) {
   );
 }
 
+function EmojiPicker({ isOwnMessage, myReaction, onReact, onClose }) {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    function handler(e) {
+      if (ref.current && !ref.current.contains(e.target)) onClose();
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={ref}
+      className={`absolute bottom-full z-50 mb-2 flex items-center gap-0.5 rounded-full border border-border bg-background p-1 shadow-lg ${
+        isOwnMessage ? "right-0" : "left-0"
+      }`}
+    >
+      {QUICK_REACTIONS.map((emoji) => (
+        <button
+          key={emoji}
+          type="button"
+          onClick={() => { onReact(emoji); onClose(); }}
+          className={`rounded-full px-1.5 py-0.5 text-lg leading-none transition-transform hover:scale-125 ${
+            myReaction === emoji ? "bg-accent/30" : ""
+          }`}
+        >
+          {emoji}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function DeleteMenu({ isOwner, onDelete, onClose }) {
   const ref = useRef(null);
 
   useEffect(() => {
-    function handleOutside(e) {
+    function handler(e) {
       if (ref.current && !ref.current.contains(e.target)) onClose();
     }
-    document.addEventListener("mousedown", handleOutside);
-    return () => document.removeEventListener("mousedown", handleOutside);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, [onClose]);
 
   return (
@@ -64,28 +111,30 @@ function DeleteMenu({ isOwner, onDelete, onClose }) {
   );
 }
 
-export function MessageBubble({ message, onEdit, onDelete, onPin, onUnpin, highlighted }) {
+// ─── main component ──────────────────────────────────────────────────────────
+
+export function MessageBubble({ message, onEdit, onDelete, onPin, onUnpin, onReact, highlighted }) {
   const isOwnMessage = message.role === "me";
   const hasImage = Boolean(message.imageUrl);
   const hasVideo = Boolean(message.videoUrl);
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [editText, setEditText] = useState(message.text);
+  const [isEditing, setIsEditing]       = useState(false);
+  const [editText, setEditText]         = useState(message.text);
+  const [pickerOpen, setPickerOpen]     = useState(false);
   const [deleteMenuOpen, setDeleteMenuOpen] = useState(false);
   const textareaRef = useRef(null);
 
   const withinEditWindow =
     message.createdAt && Date.now() - new Date(message.createdAt).getTime() < EDIT_WINDOW_MS;
-  const canEdit = isOwnMessage && !hasImage && !hasVideo && withinEditWindow && !message.isDeletedForEveryone;
+  const canEdit =
+    isOwnMessage && !hasImage && !hasVideo && withinEditWindow && !message.isDeletedForEveryone;
 
   function startEditing() {
     setEditText(message.text);
     setIsEditing(true);
     setTimeout(() => {
-      if (textareaRef.current) {
-        textareaRef.current.focus();
-        textareaRef.current.setSelectionRange(editText.length, editText.length);
-      }
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(editText.length, editText.length);
     }, 0);
   }
 
@@ -106,6 +155,8 @@ export function MessageBubble({ message, onEdit, onDelete, onPin, onUnpin, highl
     else if (e.key === "Escape") cancelEditing();
   }
 
+  const groupedReactions = groupReactions(message.reactions ?? []);
+
   const actionBtn =
     "mb-1 shrink-0 rounded-md p-1 opacity-0 transition-opacity hover:bg-accent group-hover/bubble:opacity-100";
 
@@ -113,14 +164,11 @@ export function MessageBubble({ message, onEdit, onDelete, onPin, onUnpin, highl
     ? "ring-2 ring-accent ring-offset-1 rounded-2xl transition-all duration-300"
     : "";
 
+  // ── deleted-for-everyone variant ───────────────────────────────────────────
   if (message.isDeletedForEveryone) {
     return (
       <div data-message-id={message.id} className={`flex w-full ${isOwnMessage ? "justify-end" : "justify-start"} ${highlightClass}`}>
-        <div
-          className={`max-w-[min(90%,28rem)] rounded-2xl px-3 py-2 text-[15px] leading-snug sm:max-w-[min(75%,28rem)] sm:px-3.5 ${
-            isOwnMessage ? "rounded-br-md bg-accent/40" : "rounded-bl-md bg-surface"
-          }`}
-        >
+        <div className={`max-w-[min(90%,28rem)] rounded-2xl px-3 py-2 text-[15px] leading-snug sm:max-w-[min(75%,28rem)] sm:px-3.5 ${isOwnMessage ? "rounded-br-md bg-accent/40" : "rounded-bl-md bg-surface"}`}>
           <p className="italic text-muted">This message was deleted</p>
           <p className={`mt-1 flex items-center justify-end gap-0.5 text-[11px] tabular-nums ${isOwnMessage ? "text-accent-foreground/60" : "text-muted"}`}>
             {message.time}
@@ -131,110 +179,146 @@ export function MessageBubble({ message, onEdit, onDelete, onPin, onUnpin, highl
     );
   }
 
+  // ── normal variant ─────────────────────────────────────────────────────────
   return (
     <div
       data-message-id={message.id}
       className={`group/bubble flex w-full items-end gap-1 ${isOwnMessage ? "justify-end" : "justify-start"} ${highlightClass}`}
     >
-      {/* Own-message actions: left of bubble */}
+      {/* ── Own-message actions (left of bubble) ── */}
       {isOwnMessage && !isEditing && (
         <div className="flex shrink-0 items-center gap-0.5">
           {canEdit && (
-            <button type="button" onClick={startEditing} title="Edit message" className={actionBtn}>
+            <button type="button" onClick={startEditing} title="Edit" className={actionBtn}>
               <PencilIcon className="size-3.5 text-muted-foreground" />
             </button>
           )}
-          {/* Pin / Unpin */}
           <button
             type="button"
-            title={message.isPinned ? "Unpin message" : "Pin message"}
+            title="React"
             className={actionBtn}
-            onClick={() => message.isPinned ? onUnpin(message.id) : onPin(message.id)}
+            onClick={() => setPickerOpen((v) => !v)}
+          >
+            <SmilePlusIcon className="size-3.5 text-muted-foreground" />
+          </button>
+          <button
+            type="button"
+            title={message.isPinned ? "Unpin" : "Pin"}
+            className={actionBtn}
+            onClick={() => (message.isPinned ? onUnpin(message.id) : onPin(message.id))}
           >
             {message.isPinned
               ? <PinOffIcon className="size-3.5 text-accent" />
               : <PinIcon className="size-3.5 text-muted-foreground" />}
           </button>
-          {/* Delete */}
           <div className="relative">
-            <button type="button" onClick={() => setDeleteMenuOpen((v) => !v)} title="Delete message" className={actionBtn}>
+            <button type="button" title="Delete" className={actionBtn} onClick={() => setDeleteMenuOpen((v) => !v)}>
               <TrashIcon className="size-3.5 text-muted-foreground" />
             </button>
             {deleteMenuOpen && (
-              <DeleteMenu isOwner={true} onDelete={(scope) => onDelete(message.id, scope)} onClose={() => setDeleteMenuOpen(false)} />
+              <DeleteMenu isOwner={true} onDelete={(s) => onDelete(message.id, s)} onClose={() => setDeleteMenuOpen(false)} />
             )}
           </div>
         </div>
       )}
 
-      {/* Bubble */}
-      <div
-        className={`max-w-[min(90%,28rem)] rounded-2xl px-3 py-2 text-[15px] leading-snug sm:max-w-[min(75%,28rem)] sm:px-3.5 ${
-          isOwnMessage
-            ? "rounded-br-md bg-accent text-accent-foreground"
-            : "rounded-bl-md bg-surface"
-        }`}
-      >
-        {hasImage ? (
-          <img
-            src={withTransform(message.imageUrl, IMAGE_TRANSFORM)}
-            alt=""
-            className="mb-1.5 max-h-40 max-w-full rounded-lg object-cover sm:max-h-52 sm:rounded-xl"
-          />
-        ) : null}
-        {hasVideo ? <MessageVideo src={message.videoUrl} /> : null}
+      {/* ── Bubble + reactions wrapper (relative for picker positioning) ── */}
+      <div className={`relative flex flex-col ${isOwnMessage ? "items-end" : "items-start"}`}>
 
-        {isEditing ? (
-          <div className="flex flex-col gap-1.5">
-            <textarea
-              ref={textareaRef}
-              value={editText}
-              onChange={(e) => setEditText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              rows={Math.min(6, editText.split("\n").length + 1)}
-              className="w-full resize-none rounded-lg bg-accent-foreground/10 px-2 py-1 text-[15px] leading-snug outline-none"
-            />
-            <div className="flex justify-end gap-2 text-[12px]">
-              <button type="button" onClick={cancelEditing} className="text-muted-foreground hover:text-foreground">
-                Cancel
-              </button>
-              <button type="button" onClick={saveEdit} className="font-semibold text-accent hover:opacity-80">
-                Save
-              </button>
-            </div>
-          </div>
-        ) : (
-          message.text ? <p className="whitespace-pre-wrap wrap-break-word">{message.text}</p> : null
+        {/* Emoji picker */}
+        {pickerOpen && (
+          <EmojiPicker
+            isOwnMessage={isOwnMessage}
+            myReaction={message.myReaction}
+            onReact={(emoji) => onReact(message.id, emoji)}
+            onClose={() => setPickerOpen(false)}
+          />
         )}
 
-        <p className={`mt-1 flex items-center justify-end gap-0.5 text-[11px] tabular-nums ${isOwnMessage ? "text-accent-foreground/75" : "text-muted"}`}>
-          {message.isEdited && <span className="mr-0.5 italic">edited</span>}
-          {message.time}
-          {isOwnMessage ? <MessageTicks status={message.status} /> : null}
-        </p>
+        {/* Bubble */}
+        <div className={`max-w-[min(90%,28rem)] rounded-2xl px-3 py-2 text-[15px] leading-snug sm:max-w-[min(75%,28rem)] sm:px-3.5 ${isOwnMessage ? "rounded-br-md bg-accent text-accent-foreground" : "rounded-bl-md bg-surface"}`}>
+          {hasImage ? (
+            <img src={withTransform(message.imageUrl, IMAGE_TRANSFORM)} alt="" className="mb-1.5 max-h-40 max-w-full rounded-lg object-cover sm:max-h-52 sm:rounded-xl" />
+          ) : null}
+          {hasVideo ? <MessageVideo src={message.videoUrl} /> : null}
+
+          {isEditing ? (
+            <div className="flex flex-col gap-1.5">
+              <textarea
+                ref={textareaRef}
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                onKeyDown={handleKeyDown}
+                rows={Math.min(6, editText.split("\n").length + 1)}
+                className="w-full resize-none rounded-lg bg-accent-foreground/10 px-2 py-1 text-[15px] leading-snug outline-none"
+              />
+              <div className="flex justify-end gap-2 text-[12px]">
+                <button type="button" onClick={cancelEditing} className="text-muted-foreground hover:text-foreground">Cancel</button>
+                <button type="button" onClick={saveEdit} className="font-semibold text-accent hover:opacity-80">Save</button>
+              </div>
+            </div>
+          ) : (
+            message.text ? <p className="whitespace-pre-wrap wrap-break-word">{message.text}</p> : null
+          )}
+
+          <p className={`mt-1 flex items-center justify-end gap-0.5 text-[11px] tabular-nums ${isOwnMessage ? "text-accent-foreground/75" : "text-muted"}`}>
+            {message.isEdited && <span className="mr-0.5 italic">edited</span>}
+            {message.time}
+            {isOwnMessage ? <MessageTicks status={message.status} /> : null}
+          </p>
+        </div>
+
+        {/* Reaction badges */}
+        {groupedReactions.length > 0 && (
+          <div className={`-mt-1 mb-1 flex flex-wrap gap-1 ${isOwnMessage ? "justify-end pr-1" : "justify-start pl-1"}`}>
+            {groupedReactions.map(([emoji, userIds]) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => onReact(message.id, emoji)}
+                className={`flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[13px] transition-colors ${
+                  message.myReaction === emoji
+                    ? "border-accent bg-accent/20 font-medium"
+                    : "border-border bg-background hover:bg-accent/10"
+                }`}
+              >
+                <span>{emoji}</span>
+                {userIds.length > 1 && (
+                  <span className="text-[11px] text-muted-foreground">{userIds.length}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Received-message actions: right of bubble */}
+      {/* ── Received-message actions (right of bubble) ── */}
       {!isOwnMessage && (
         <div className="flex shrink-0 items-center gap-0.5">
-          {/* Pin / Unpin */}
           <button
             type="button"
-            title={message.isPinned ? "Unpin message" : "Pin message"}
+            title="React"
             className={actionBtn}
-            onClick={() => message.isPinned ? onUnpin(message.id) : onPin(message.id)}
+            onClick={() => setPickerOpen((v) => !v)}
+          >
+            <SmilePlusIcon className="size-3.5 text-muted-foreground" />
+          </button>
+          <button
+            type="button"
+            title={message.isPinned ? "Unpin" : "Pin"}
+            className={actionBtn}
+            onClick={() => (message.isPinned ? onUnpin(message.id) : onPin(message.id))}
           >
             {message.isPinned
               ? <PinOffIcon className="size-3.5 text-accent" />
               : <PinIcon className="size-3.5 text-muted-foreground" />}
           </button>
-          {/* Delete */}
           <div className="relative">
-            <button type="button" onClick={() => setDeleteMenuOpen((v) => !v)} title="Remove from your chat" className={actionBtn}>
+            <button type="button" title="Remove from chat" className={actionBtn} onClick={() => setDeleteMenuOpen((v) => !v)}>
               <TrashIcon className="size-3.5 text-muted-foreground" />
             </button>
             {deleteMenuOpen && (
-              <DeleteMenu isOwner={false} onDelete={(scope) => onDelete(message.id, scope)} onClose={() => setDeleteMenuOpen(false)} />
+              <DeleteMenu isOwner={false} onDelete={(s) => onDelete(message.id, s)} onClose={() => setDeleteMenuOpen(false)} />
             )}
           </div>
         </div>

@@ -12,6 +12,7 @@ export function MessageList() {
   const deleteMessage = useChatStore((state) => state.deleteMessage);
   const pinMessage = useChatStore((state) => state.pinMessage);
   const unpinMessage = useChatStore((state) => state.unpinMessage);
+  const reactToMessage = useChatStore((state) => state.reactToMessage);
 
   const [highlightedMessageId, setHighlightedMessageId] = useState(null);
 
@@ -55,6 +56,7 @@ export function MessageList() {
                 onDelete={deleteMessage}
                 onPin={pinMessage}
                 onUnpin={unpinMessage}
+                onReact={reactToMessage}
                 highlighted={message.id === highlightedMessageId}
               />
             ))}
