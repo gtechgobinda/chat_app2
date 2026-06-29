@@ -24,6 +24,21 @@ io.on("connection", (socket) => {
   // io.emit() sends event to everyone - broadcast
   io.emit("getOnlineUsers", Object.keys(userSocketMap));
 
+  socket.on("typing", ({ receiverId }) => {
+    const receiverSocketId = userSocketMap[receiverId];
+    console.log(`[typing] from=${userId} to=${receiverId} receiverSocket=${receiverSocketId}`);
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("typing", { senderId: userId });
+    }
+  });
+
+  socket.on("stopTyping", ({ receiverId }) => {
+    const receiverSocketId = userSocketMap[receiverId];
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("stopTyping", { senderId: userId });
+    }
+  });
+
   // socket.on is used to listen for events
   socket.on("disconnect", () => {
     if (userId) delete userSocketMap[userId];

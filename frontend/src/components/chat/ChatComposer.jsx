@@ -6,6 +6,21 @@ import { useChatStore } from "../../store/useChatStore";
 import { useSelectedConversation } from "../../hooks/useSelectedConversation";
 import { AISuggestions } from "./AISuggestions";
 
+function TypingIndicator({ name }) {
+  return (
+    <div className="flex items-center gap-2 px-4 py-1.5">
+      <div className="flex items-center gap-1">
+        <span className="size-1.5 animate-bounce rounded-full bg-muted [animation-delay:0ms]" />
+        <span className="size-1.5 animate-bounce rounded-full bg-muted [animation-delay:150ms]" />
+        <span className="size-1.5 animate-bounce rounded-full bg-muted [animation-delay:300ms]" />
+      </div>
+      <span className="text-xs text-muted">{name} is typing...</span>
+    </div>
+  );
+}
+
+const TYPING_STOP_DELAY = 1500;
+
 export function ChatComposer() {
   const composerText = useChatStore((state) => state.composerText);
   const isSoundEnabled = useChatStore((state) => state.isSoundEnabled);
@@ -13,15 +28,28 @@ export function ChatComposer() {
   const isSendingMedia = useChatStore((state) => state.isSendingMedia);
   const sendTextMessage = useChatStore((state) => state.sendTextMessage);
   const setComposerText = useChatStore((state) => state.setComposerText);
-  const { activeConversationId } = useSelectedConversation();
+  const { activeConversationId, activeConversation } = useSelectedConversation();
   const { playRandomKeyStrokeSound } = useKeyboardSound();
+  const typingUsers = useChatStore((state) => state.typingUsers);
   const mediaInputRef = useRef(null);
+  const typingTimerRef = useRef(null);
+  const sendTypingEvent = useChatStore((state) => state.sendTypingEvent);
+  const sendStopTypingEvent = useChatStore((state) => state.sendStopTypingEvent);
+
+  const isPeerTyping = activeConversationId ? !!typingUsers[activeConversationId] : false;
+  const peerName = activeConversation?.peer?.name?.split(" ")[0] ?? "";
 
   const playSoundIfEnabled = () => {
     if (isSoundEnabled) playRandomKeyStrokeSound();
   };
 
+  const stopTyping = () => {
+    clearTimeout(typingTimerRef.current);
+    sendStopTypingEvent(activeConversationId);
+  };
+
   const handleSend = async () => {
+    stopTyping();
     const didSendMessage = await sendTextMessage(activeConversationId);
     if (didSendMessage) playSoundIfEnabled();
   };
@@ -29,6 +57,10 @@ export function ChatComposer() {
   const handleComposerTextChange = (event) => {
     setComposerText(event.target.value);
     playSoundIfEnabled();
+
+    sendTypingEvent(activeConversationId);
+    clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(stopTyping, TYPING_STOP_DELAY);
   };
 
   const handleMediaPick = async (event) => {
@@ -46,6 +78,7 @@ export function ChatComposer() {
 
   return (
     <footer className="shrink-0 border-t border-border">
+      {isPeerTyping && <TypingIndicator name={peerName} />}
       <AISuggestions />
       <div className="px-1.5 pb-2 pt-2 sm:px-2">
         {isSendingMedia ? (

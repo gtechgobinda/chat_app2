@@ -21,6 +21,7 @@ export const useChatStore = create(
       composerText: "",
       isSoundEnabled: true,
       isSendingMedia: false,
+      typingUsers: {},
 
       getUsers: async () => {
         set({ isUsersLoading: true });
@@ -92,14 +93,42 @@ export const useChatStore = create(
           if (String(newMessage.senderId) !== String(userId)) return;
 
           set({ messages: [...get().messages, newMessage] });
+          // clear typing when message arrives
+          set((state) => ({ typingUsers: { ...state.typingUsers, [userId]: false } }));
 
           get().getConversations();
+        });
+
+        socket.off("typing");
+        socket.on("typing", ({ senderId }) => {
+          console.log("[typing received]", { senderId, expectedUserId: userId, match: String(senderId) === String(userId) });
+          if (String(senderId) !== String(userId)) return;
+          set((state) => ({ typingUsers: { ...state.typingUsers, [senderId]: true } }));
+          console.log("[typingUsers updated]", get().typingUsers);
+        });
+
+        socket.off("stopTyping");
+        socket.on("stopTyping", ({ senderId }) => {
+          if (String(senderId) !== String(userId)) return;
+          set((state) => ({ typingUsers: { ...state.typingUsers, [senderId]: false } }));
         });
       },
 
       unsubscribeFromMessages: () => {
         const socket = useAuthStore.getState().socket;
         socket?.off("newMessage");
+        socket?.off("typing");
+        socket?.off("stopTyping");
+      },
+
+      sendTypingEvent: (receiverId) => {
+        const socket = useAuthStore.getState().socket;
+        socket?.emit("typing", { receiverId });
+      },
+
+      sendStopTypingEvent: (receiverId) => {
+        const socket = useAuthStore.getState().socket;
+        socket?.emit("stopTyping", { receiverId });
       },
 
       setSelectedUser: (selectedUser) => set({ selectedUser }),
