@@ -1,6 +1,7 @@
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
+import Message from "../models/message.model.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -36,6 +37,21 @@ io.on("connection", (socket) => {
     const receiverSocketId = userSocketMap[receiverId];
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("stopTyping", { senderId: userId });
+    }
+  });
+
+  socket.on("markMessagesRead", async ({ senderId }) => {
+    if (!userId || !senderId) return;
+    const now = new Date();
+    const result = await Message.updateMany(
+      { senderId, receiverId: userId, readAt: { $exists: false } },
+      { $set: { readAt: now } },
+    );
+    if (result.modifiedCount > 0) {
+      const senderSocketId = userSocketMap[senderId];
+      if (senderSocketId) {
+        io.to(senderSocketId).emit("messagesRead", { by: userId, at: now.toISOString() });
+      }
     }
   });
 

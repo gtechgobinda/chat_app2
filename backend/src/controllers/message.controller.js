@@ -67,6 +67,33 @@ export async function getMessages(req, res) {
 
     const messages = await Message.find(query).sort({ createdAt: 1 });
 
+    // Mark messages from the other user as delivered since receiver is now fetching them
+    if (!iHaveBlocked) {
+      const undeliveredIds = messages
+        .filter((m) => String(m.senderId) === String(userToChatId) && !m.deliveredAt)
+        .map((m) => m._id);
+
+      if (undeliveredIds.length > 0) {
+        const now = new Date();
+        await Message.updateMany(
+          { _id: { $in: undeliveredIds }, deliveredAt: { $exists: false } },
+          { $set: { deliveredAt: now } },
+        );
+        const senderSocketId = getReceiverSocketId(userToChatId);
+        if (senderSocketId) {
+          for (const messageId of undeliveredIds) {
+            io.to(senderSocketId).emit("messageDelivered", { messageId, deliveredAt: now });
+          }
+        }
+        // Patch the in-memory messages so the response reflects the update
+        messages.forEach((m) => {
+          if (undeliveredIds.some((id) => String(id) === String(m._id))) {
+            m.deliveredAt = now;
+          }
+        });
+      }
+    }
+
     res.status(200).json(messages);
   } catch (error) {
     console.error("Error in getMessages:", error.message);
@@ -106,21 +133,34 @@ export async function sendMessage(req, res) {
       else imageUrl = url;
     }
 
+    const receiverSocketId = getReceiverSocketId(receiverId);
+    const deliveredAt = !senderIsBlockedByReceiver && receiverSocketId ? new Date() : undefined;
+
     const newMessage = new Message({
       senderId,
       receiverId,
       text,
       image: imageUrl,
       video: videoUrl,
+      deliveredAt,
     });
 
     await newMessage.save();
 
     // Only deliver if the receiver has not blocked the sender
     if (!senderIsBlockedByReceiver) {
-      const receiverSocketId = getReceiverSocketId(receiverId);
       if (receiverSocketId) {
         io.to(receiverSocketId).emit("newMessage", newMessage);
+      }
+      // Notify sender their message was delivered (receiver is online)
+      if (deliveredAt) {
+        const senderSocketId = getReceiverSocketId(senderId);
+        if (senderSocketId) {
+          io.to(senderSocketId).emit("messageDelivered", {
+            messageId: newMessage._id,
+            deliveredAt: newMessage.deliveredAt,
+          });
+        }
       }
     }
 

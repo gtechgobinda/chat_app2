@@ -59,6 +59,8 @@ export const useChatStore = create(
         try {
           const res = await axiosInstance.get(`/messages/${userId}`);
           set({ messages: res.data });
+          // We're viewing this conversation — mark their messages as read
+          get().markMessagesAsRead(userId);
         } catch (error) {
           toast.error(error.response?.data?.message || "Failed to load messages");
         } finally {
@@ -95,6 +97,8 @@ export const useChatStore = create(
           set({ messages: [...get().messages, newMessage] });
           // clear typing when message arrives
           set((state) => ({ typingUsers: { ...state.typingUsers, [userId]: false } }));
+          // Mark as read since we're actively in this conversation
+          get().markMessagesAsRead(userId);
 
           get().getConversations();
         });
@@ -112,6 +116,27 @@ export const useChatStore = create(
           if (String(senderId) !== String(userId)) return;
           set((state) => ({ typingUsers: { ...state.typingUsers, [senderId]: false } }));
         });
+
+        socket.off("messageDelivered");
+        socket.on("messageDelivered", ({ messageId, deliveredAt }) => {
+          set((state) => ({
+            messages: state.messages.map((msg) =>
+              String(msg._id) === String(messageId) ? { ...msg, deliveredAt } : msg,
+            ),
+          }));
+        });
+
+        socket.off("messagesRead");
+        socket.on("messagesRead", ({ at }) => {
+          const authUserId = useAuthStore.getState().authUser?._id;
+          set((state) => ({
+            messages: state.messages.map((msg) =>
+              String(msg.senderId) === String(authUserId) && !msg.readAt
+                ? { ...msg, readAt: at }
+                : msg,
+            ),
+          }));
+        });
       },
 
       unsubscribeFromMessages: () => {
@@ -119,6 +144,13 @@ export const useChatStore = create(
         socket?.off("newMessage");
         socket?.off("typing");
         socket?.off("stopTyping");
+        socket?.off("messageDelivered");
+        socket?.off("messagesRead");
+      },
+
+      markMessagesAsRead: (senderId) => {
+        const socket = useAuthStore.getState().socket;
+        socket?.emit("markMessagesRead", { senderId });
       },
 
       sendTypingEvent: (receiverId) => {
