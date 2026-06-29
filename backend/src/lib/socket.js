@@ -2,6 +2,7 @@ import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 import Message from "../models/message.model.js";
+import User from "../models/user.model.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -55,9 +56,15 @@ io.on("connection", (socket) => {
     }
   });
 
-  // socket.on is used to listen for events
-  socket.on("disconnect", () => {
-    if (userId) delete userSocketMap[userId];
+  socket.on("disconnect", async () => {
+    if (userId) {
+      delete userSocketMap[userId];
+      try {
+        await User.findByIdAndUpdate(userId, { lastSeen: new Date() });
+      } catch (e) {
+        console.error("Failed to update lastSeen:", e.message);
+      }
+    }
     io.emit("getOnlineUsers", Object.keys(userSocketMap));
   });
 });

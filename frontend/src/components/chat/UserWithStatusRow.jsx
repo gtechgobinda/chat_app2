@@ -4,6 +4,7 @@ import { getInitials } from "../../hooks/useSelectedConversation";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useFriendStore } from "../../store/useFriendStore";
 import { AvatarWithOnlineIndicator } from "./AvatarWithOnlineIndicator";
+import { formatLastSeen } from "../../lib/utils";
 
 export function UserWithStatusRow({ user, isFriend, onOpenChat, onSendRequest }) {
   const onlineUsers = useAuthStore((state) => state.onlineUsers);
@@ -27,7 +28,9 @@ export function UserWithStatusRow({ user, isFriend, onOpenChat, onSendRequest })
 
       <div className="min-w-0 flex-1">
         <p className="truncate text-[15px] font-semibold">{user.fullName}</p>
-        <p className="truncate text-xs text-muted">{user.email}</p>
+        <p className="truncate text-xs text-muted">
+          {isOnline ? "Online" : formatLastSeen(user.lastSeen)}
+        </p>
       </div>
 
       <div className="shrink-0">

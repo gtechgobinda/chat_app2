@@ -11,6 +11,7 @@ import { WallpaperPicker } from "../WallpaperPicker";
 import { useChatStore } from "../../store/useChatStore";
 import { useBlockStore } from "../../store/useBlockStore";
 import { useSelectedConversation } from "../../hooks/useSelectedConversation";
+import { formatLastSeen } from "../../lib/utils";
 
 const MUTE_OPTIONS = [
   { label: "For 8 hours", value: "8h" },
@@ -124,7 +125,7 @@ export function ChatHeader() {
               ) : activeConversation.peer.isOnline ? (
                 <span className="font-medium text-success">Online</span>
               ) : (
-                "Offline"
+                <span>{formatLastSeen(activeConversation.peer.lastSeen)}</span>
               )}
             </p>
           </div>

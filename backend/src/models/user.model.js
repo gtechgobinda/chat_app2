@@ -44,6 +44,10 @@ const userSchema = new mongoose.Schema(
         mutedUntil: { type: Date, default: null }, // null = muted forever
       },
     ],
+    lastSeen: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }, // createdAt & updatedAt
 );
