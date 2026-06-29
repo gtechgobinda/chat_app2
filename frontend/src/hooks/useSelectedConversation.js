@@ -30,6 +30,8 @@ function mapUserToConversation({ user, messages, authUser, onlineUsers }) {
       imageUrl: message.image,
       videoUrl: message.video,
       status,
+      isEdited: Boolean(message.editedAt),
+      createdAt: message.createdAt,
     };
   });
 

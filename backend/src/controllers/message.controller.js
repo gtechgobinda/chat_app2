@@ -217,6 +217,50 @@ export async function getMessages(req, res) {
   }
 }
 
+const EDIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+export async function editMessage(req, res) {
+  try {
+    const { id: messageId } = req.params;
+    const { text } = req.body;
+    const senderId = req.user._id;
+
+    if (!text?.trim()) {
+      return res.status(400).json({ message: "Message text cannot be empty" });
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message) return res.status(404).json({ message: "Message not found" });
+
+    if (String(message.senderId) !== String(senderId)) {
+      return res.status(403).json({ message: "You can only edit your own messages" });
+    }
+
+    if (Date.now() - message.createdAt.getTime() > EDIT_WINDOW_MS) {
+      return res.status(403).json({ message: "Edit window has expired" });
+    }
+
+    const now = new Date();
+    message.text = text.trim();
+    message.editedAt = now;
+    await message.save();
+
+    const receiverSocketId = getReceiverSocketId(message.receiverId);
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("messageEdited", {
+        messageId: message._id,
+        text: message.text,
+        editedAt: now,
+      });
+    }
+
+    res.status(200).json(message);
+  } catch (error) {
+    console.error("Error in editMessage:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
 export async function sendMessage(req, res) {
   try {
     const { text } = req.body;

@@ -8,6 +8,7 @@ import {
   muteConversation,
   unmuteConversation,
   getMessages,
+  editMessage,
   getUsersForSidebar,
   sendMessage,
 } from "../controllers/message.controller.js";
@@ -27,6 +28,7 @@ router.get("/muted", getMutedConversations);
 router.post("/mute/:id", muteConversation);
 router.delete("/mute/:id", unmuteConversation);
 router.get("/:id", getMessages);
+router.patch("/:id", editMessage);
 router.post("/send/:id", upload.single("media"), sendMessage);
 
 export default router;

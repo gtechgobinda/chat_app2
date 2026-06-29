@@ -2,9 +2,11 @@ import useScrollToBottom from "../../hooks/useScrollToBottom";
 import { MessageBubble } from "./MessageBubble";
 import { NoConversationPlaceholder } from "./NoConversationPlaceholder";
 import { useSelectedConversation } from "../../hooks/useSelectedConversation";
+import { useChatStore } from "../../store/useChatStore";
 
 export function MessageList() {
   const { activeConversation, activeConversationId } = useSelectedConversation();
+  const editMessage = useChatStore((state) => state.editMessage);
 
   const lastMessageId = activeConversation?.messages.at(-1)?.id;
   const messagesScrollRef = useScrollToBottom(activeConversationId, lastMessageId);
@@ -20,7 +22,7 @@ export function MessageList() {
             Today
           </p>
           {activeConversation.messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
+            <MessageBubble key={message.id} message={message} onEdit={editMessage} />
           ))}
         </div>
       ) : (

@@ -150,6 +150,23 @@ export const useChatStore = create(
         }
       },
 
+      editMessage: async (messageId, newText) => {
+        try {
+          const res = await axiosInstance.patch(`/messages/${messageId}`, { text: newText });
+          set((state) => ({
+            messages: state.messages.map((m) =>
+              String(m._id) === String(messageId)
+                ? { ...m, text: res.data.text, editedAt: res.data.editedAt }
+                : m,
+            ),
+          }));
+          return true;
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to edit message");
+          return false;
+        }
+      },
+
       sendMessage: async (messageData) => {
         const { selectedUser, messages } = get();
         if (!selectedUser) return false;
@@ -226,6 +243,15 @@ export const useChatStore = create(
             ),
           }));
         });
+
+        socket.off("messageEdited");
+        socket.on("messageEdited", ({ messageId, text, editedAt }) => {
+          set((state) => ({
+            messages: state.messages.map((m) =>
+              String(m._id) === String(messageId) ? { ...m, text, editedAt } : m,
+            ),
+          }));
+        });
       },
 
       unsubscribeFromMessages: () => {
@@ -235,6 +261,7 @@ export const useChatStore = create(
         socket?.off("stopTyping");
         socket?.off("messageDelivered");
         socket?.off("messagesRead");
+        socket?.off("messageEdited");
       },
 
       markMessagesAsRead: (senderId) => {
