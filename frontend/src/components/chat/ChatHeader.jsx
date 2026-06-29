@@ -1,14 +1,15 @@
+import { useEffect } from "react";
 import { Avatar, Button } from "@heroui/react";
-import { ChevronLeftIcon, Volume2Icon, VolumeXIcon, XIcon } from "lucide-react";
+import { BanIcon, ChevronLeftIcon, Volume2Icon, VolumeXIcon, XIcon } from "lucide-react";
 import { AppLogo } from "../AppLogo";
 import { AvatarWithOnlineIndicator } from "./AvatarWithOnlineIndicator";
 
 import { ThemePresetPicker } from "../ThemePresetPicker";
-
 import { ThemeToggle } from "../ThemeToggle";
 import { WallpaperPicker } from "../WallpaperPicker";
 
 import { useChatStore } from "../../store/useChatStore";
+import { useBlockStore } from "../../store/useBlockStore";
 import { useSelectedConversation } from "../../hooks/useSelectedConversation";
 
 export function ChatHeader() {
@@ -19,6 +20,27 @@ export function ChatHeader() {
 
   const { activeConversation, activeConversationId, isLargeScreen } = useSelectedConversation();
   const isPeerTyping = activeConversationId ? !!typingUsers[activeConversationId] : false;
+
+  const getBlockedUsers = useBlockStore((state) => state.getBlockedUsers);
+  const blockUser = useBlockStore((state) => state.blockUser);
+  const unblockUser = useBlockStore((state) => state.unblockUser);
+  const isBlocked = useBlockStore((state) => state.isBlocked);
+
+  useEffect(() => {
+    getBlockedUsers();
+  }, []);
+
+  const peerId = activeConversationId;
+  const peerIsBlocked = peerId ? isBlocked(peerId) : false;
+
+  const handleToggleBlock = async () => {
+    if (!peerId) return;
+    if (peerIsBlocked) {
+      await unblockUser(peerId);
+    } else {
+      await blockUser(peerId);
+    }
+  };
 
   return (
     <header className="sticky top-0 z-10 flex shrink-0 flex-wrap items-center gap-1 border-b border-border px-1.5 py-1.5 sm:gap-2 sm:px-2 sm:py-2">
@@ -36,7 +58,7 @@ export function ChatHeader() {
 
       {activeConversation ? (
         <>
-          <AvatarWithOnlineIndicator isOnline={activeConversation.peer.isOnline ?? true}>
+          <AvatarWithOnlineIndicator isOnline={!peerIsBlocked && (activeConversation.peer.isOnline ?? true)}>
             <Avatar className="size-9 shrink-0">
               <Avatar.Image
                 alt={activeConversation.peer.name}
@@ -53,7 +75,9 @@ export function ChatHeader() {
               {activeConversation.peer.name}
             </p>
             <p className="truncate text-xs text-muted">
-              {isPeerTyping ? (
+              {peerIsBlocked ? (
+                <span className="font-medium text-destructive">Blocked</span>
+              ) : isPeerTyping ? (
                 <span className="animate-pulse font-medium text-accent">typing...</span>
               ) : activeConversation.peer.isOnline ? (
                 <span className="font-medium text-success">Online</span>
@@ -96,16 +120,30 @@ export function ChatHeader() {
         </Button>
 
         {activeConversation ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            isIconOnly
-            className="shrink-0"
-            aria-label="Close chat"
-            onPress={() => setActiveConversationId(null)}
-          >
-            <XIcon className="size-5.5" strokeWidth={2} aria-hidden />
-          </Button>
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              isIconOnly
+              className={`shrink-0 ${peerIsBlocked ? "text-destructive" : ""}`}
+              aria-label={peerIsBlocked ? "Unblock user" : "Block user"}
+              title={peerIsBlocked ? "Unblock user" : "Block user"}
+              onPress={handleToggleBlock}
+            >
+              <BanIcon className="size-5" strokeWidth={2} aria-hidden />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              isIconOnly
+              className="shrink-0"
+              aria-label="Close chat"
+              onPress={() => setActiveConversationId(null)}
+            >
+              <XIcon className="size-5.5" strokeWidth={2} aria-hidden />
+            </Button>
+          </>
         ) : null}
       </div>
     </header>

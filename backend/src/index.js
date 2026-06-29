@@ -17,6 +17,7 @@ import authRoutes from "./routes/auth.route.js";
 import messageRoutes from "./routes/message.route.js";
 import aiRoutes from "./routes/ai.route.js";
 import friendRoutes from "./routes/friend.route.js";
+import blockRoutes from "./routes/block.route.js";
 import { app, server } from "./lib/socket.js";
 
 const PORT = process.env.PORT;
@@ -39,6 +40,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/friends", friendRoutes);
+app.use("/api/block", blockRoutes);
 
 // if the public directory exists, serve the static files
 // this is for the production build

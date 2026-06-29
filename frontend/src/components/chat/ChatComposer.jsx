@@ -1,8 +1,9 @@
 import { Button, TextArea } from "@heroui/react";
-import { ImageIcon, LoaderIcon, SendHorizontalIcon } from "lucide-react";
+import { BanIcon, ImageIcon, LoaderIcon, SendHorizontalIcon } from "lucide-react";
 import { useRef } from "react";
 import useKeyboardSound from "../../hooks/useKeyboardSound";
 import { useChatStore } from "../../store/useChatStore";
+import { useBlockStore } from "../../store/useBlockStore";
 import { useSelectedConversation } from "../../hooks/useSelectedConversation";
 import { AISuggestions } from "./AISuggestions";
 
@@ -38,6 +39,10 @@ export function ChatComposer() {
 
   const isPeerTyping = activeConversationId ? !!typingUsers[activeConversationId] : false;
   const peerName = activeConversation?.peer?.name?.split(" ")[0] ?? "";
+
+  const isBlocked = useBlockStore((state) => state.isBlocked);
+  const unblockUser = useBlockStore((state) => state.unblockUser);
+  const peerIsBlocked = activeConversationId ? isBlocked(activeConversationId) : false;
 
   const playSoundIfEnabled = () => {
     if (isSoundEnabled) playRandomKeyStrokeSound();
@@ -75,6 +80,27 @@ export function ChatComposer() {
 
     if (didSendMessage) playSoundIfEnabled();
   };
+
+  if (peerIsBlocked) {
+    return (
+      <footer className="shrink-0 border-t border-border">
+        <div className="flex items-center justify-between gap-3 px-4 py-3">
+          <div className="flex items-center gap-2 text-sm text-destructive">
+            <BanIcon className="size-4 shrink-0" />
+            <span>You have blocked <strong>{activeConversation?.peer?.name}</strong></span>
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            onPress={() => unblockUser(activeConversationId)}
+            className="shrink-0 text-xs"
+          >
+            Unblock
+          </Button>
+        </div>
+      </footer>
+    );
+  }
 
   return (
     <footer className="shrink-0 border-t border-border">

@@ -53,12 +53,19 @@ export async function getMessages(req, res) {
     const { id: userToChatId } = req.params;
     const myId = req.user._id;
 
-    const messages = await Message.find({
-      $or: [
-        { senderId: myId, receiverId: userToChatId },
-        { senderId: userToChatId, receiverId: myId },
-      ],
-    }).sort({ createdAt: 1 });
+    const iHaveBlocked = req.user.blockedUsers.map(String).includes(String(userToChatId));
+
+    // If I blocked them, only return messages I sent — their messages stay hidden.
+    const query = iHaveBlocked
+      ? { senderId: myId, receiverId: userToChatId }
+      : {
+          $or: [
+            { senderId: myId, receiverId: userToChatId },
+            { senderId: userToChatId, receiverId: myId },
+          ],
+        };
+
+    const messages = await Message.find(query).sort({ createdAt: 1 });
 
     res.status(200).json(messages);
   } catch (error) {
@@ -76,6 +83,15 @@ export async function sendMessage(req, res) {
     if (!req.user.friends.map(String).includes(String(receiverId))) {
       return res.status(403).json({ message: "You can only message friends" });
     }
+
+    if (req.user.blockedUsers.map(String).includes(String(receiverId))) {
+      return res.status(403).json({ message: "You have blocked this user" });
+    }
+
+    // Check if receiver has blocked sender — save the message but silently drop delivery
+    // so the sender has no idea they are blocked.
+    const receiver = await User.findById(receiverId).select("blockedUsers");
+    const senderIsBlockedByReceiver = receiver?.blockedUsers.map(String).includes(String(senderId));
 
     let imageUrl;
     let videoUrl;
@@ -100,10 +116,12 @@ export async function sendMessage(req, res) {
 
     await newMessage.save();
 
-    const receiverSocketId = getReceiverSocketId(receiverId);
-    // only send the message in realtime if user is online
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("newMessage", newMessage);
+    // Only deliver if the receiver has not blocked the sender
+    if (!senderIsBlockedByReceiver) {
+      const receiverSocketId = getReceiverSocketId(receiverId);
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("newMessage", newMessage);
+      }
     }
 
     res.status(201).json(newMessage);
