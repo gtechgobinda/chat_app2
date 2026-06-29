@@ -38,6 +38,12 @@ const userSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    mutedConversations: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+        mutedUntil: { type: Date, default: null }, // null = muted forever
+      },
+    ],
   },
   { timestamps: true }, // createdAt & updatedAt
 );

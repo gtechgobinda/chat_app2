@@ -12,6 +12,7 @@ function ChatPage() {
 
   const getConversations = useChatStore((state) => state.getConversations);
   const getArchivedConversations = useChatStore((state) => state.getArchivedConversations);
+  const getMutedConversations = useChatStore((state) => state.getMutedConversations);
   const getMessages = useChatStore((state) => state.getMessages);
   const getUsers = useChatStore((state) => state.getUsers);
   const subscribeToMessages = useChatStore((state) => state.subscribeToMessages);
@@ -23,7 +24,8 @@ function ChatPage() {
     getUsers();
     getConversations();
     getArchivedConversations();
-  }, [getConversations, getArchivedConversations, getUsers]);
+    getMutedConversations();
+  }, [getConversations, getArchivedConversations, getMutedConversations, getUsers]);
 
   useEffect(() => {
     if (!activeConversationId) return;

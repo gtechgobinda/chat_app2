@@ -4,6 +4,9 @@ import {
   getArchivedConversations,
   archiveConversation,
   unarchiveConversation,
+  getMutedConversations,
+  muteConversation,
+  unmuteConversation,
   getMessages,
   getUsersForSidebar,
   sendMessage,
@@ -20,6 +23,9 @@ router.get("/conversations", getConversationsForSidebar);
 router.get("/archived", getArchivedConversations);
 router.post("/archive/:id", archiveConversation);
 router.delete("/archive/:id", unarchiveConversation);
+router.get("/muted", getMutedConversations);
+router.post("/mute/:id", muteConversation);
+router.delete("/mute/:id", unmuteConversation);
 router.get("/:id", getMessages);
 router.post("/send/:id", upload.single("media"), sendMessage);
 

@@ -5,12 +5,32 @@ import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "./useAuthStore";
 import toast from "react-hot-toast";
 
+function playNotificationTone() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(880, ctx.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.12);
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.35);
+  } catch (_) {
+    // audio not available — silent fail
+  }
+}
+
 export const useChatStore = create(
   persist(
     (set, get) => ({
       users: [],
       conversations: [],
       archivedConversations: [],
+      mutedConversations: [], // [{ userId, mutedUntil: ISO string | null }]
       messages: [],
       selectedUser: null,
       isConversationsLoading: false,
@@ -81,6 +101,40 @@ export const useChatStore = create(
         }
       },
 
+      getMutedConversations: async () => {
+        try {
+          const res = await axiosInstance.get("/messages/muted");
+          set({ mutedConversations: res.data });
+        } catch (error) {
+          console.log("Error in getMutedConversations", error.message);
+        }
+      },
+
+      muteConversation: async (userId, duration) => {
+        try {
+          await axiosInstance.post(`/messages/mute/${userId}`, { duration });
+          await get().getMutedConversations();
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to mute conversation");
+        }
+      },
+
+      unmuteConversation: async (userId) => {
+        try {
+          await axiosInstance.delete(`/messages/mute/${userId}`);
+          await get().getMutedConversations();
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to unmute conversation");
+        }
+      },
+
+      isConversationMuted: (userId) => {
+        const entry = get().mutedConversations.find((m) => String(m.userId) === String(userId));
+        if (!entry) return false;
+        if (entry.mutedUntil === null) return true;
+        return new Date(entry.mutedUntil) > new Date();
+      },
+
       getMessages: async (userId) => {
         if (!userId) return;
         set({ isMessagesLoading: true });
@@ -122,6 +176,11 @@ export const useChatStore = create(
           // Always refresh conversation lists so archived auto-unarchive is reflected
           get().getConversations();
           get().getArchivedConversations();
+
+          // Play notification sound unless this conversation is muted or global sound is off
+          if (get().isSoundEnabled && !get().isConversationMuted(newMessage.senderId)) {
+            playNotificationTone();
+          }
 
           // if im not the receiver don't do anything just return
           if (String(newMessage.senderId) !== String(userId)) return;

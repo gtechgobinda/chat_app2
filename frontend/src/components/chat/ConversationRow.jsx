@@ -1,8 +1,8 @@
 import { Avatar } from "@heroui/react";
-import { ArchiveIcon, ArchiveRestoreIcon } from "lucide-react";
+import { ArchiveIcon, ArchiveRestoreIcon, BellOffIcon } from "lucide-react";
 import { AvatarWithOnlineIndicator } from "./AvatarWithOnlineIndicator";
 
-export function ConversationRow({ user, selected, onSelect, onArchive, onUnarchive }) {
+export function ConversationRow({ user, selected, onSelect, onArchive, onUnarchive, isMuted }) {
   const actionIcon = onUnarchive ? (
     <ArchiveRestoreIcon className="size-4 text-muted-foreground" />
   ) : onArchive ? (
@@ -32,7 +32,12 @@ export function ConversationRow({ user, selected, onSelect, onArchive, onUnarchi
         </AvatarWithOnlineIndicator>
 
         <div className="min-w-0 flex-1 pr-6">
-          <p className="truncate text-[15px] font-semibold">{user.name}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="truncate text-[15px] font-semibold">{user.name}</p>
+            {isMuted && (
+              <BellOffIcon className="size-3.5 shrink-0 text-muted-foreground" aria-label="Muted" />
+            )}
+          </div>
         </div>
       </button>
 

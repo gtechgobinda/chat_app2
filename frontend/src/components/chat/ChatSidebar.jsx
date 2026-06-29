@@ -34,6 +34,7 @@ function ChatSidebar() {
   const archivedConversations = useChatStore((state) => state.archivedConversations);
   const archiveConversation = useChatStore((state) => state.archiveConversation);
   const unarchiveConversation = useChatStore((state) => state.unarchiveConversation);
+  const isConversationMuted = useChatStore((state) => state.isConversationMuted);
   const users = useChatStore((state) => state.users);
 
   const searchQuery = useChatStore((state) => state.searchQuery);
@@ -196,6 +197,7 @@ function ChatSidebar() {
                   selected={conversation.id === activeConversationId}
                   onSelect={() => setActiveConversationId(conversation.id)}
                   onArchive={archiveConversation}
+                  isMuted={isConversationMuted(conversation.id)}
                 />
               ))}
 
@@ -226,6 +228,7 @@ function ChatSidebar() {
                         selected={conversation.id === activeConversationId}
                         onSelect={() => setActiveConversationId(conversation.id)}
                         onUnarchive={unarchiveConversation}
+                        isMuted={isConversationMuted(conversation.id)}
                       />
                     ))}
                 </div>

@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Avatar, Button } from "@heroui/react";
-import { BanIcon, ChevronLeftIcon, Volume2Icon, VolumeXIcon, XIcon } from "lucide-react";
+import { BanIcon, BellIcon, BellOffIcon, ChevronLeftIcon, Volume2Icon, VolumeXIcon, XIcon } from "lucide-react";
 import { AppLogo } from "../AppLogo";
 import { AvatarWithOnlineIndicator } from "./AvatarWithOnlineIndicator";
 
@@ -12,13 +12,49 @@ import { useChatStore } from "../../store/useChatStore";
 import { useBlockStore } from "../../store/useBlockStore";
 import { useSelectedConversation } from "../../hooks/useSelectedConversation";
 
+const MUTE_OPTIONS = [
+  { label: "For 8 hours", value: "8h" },
+  { label: "For 1 week", value: "1w" },
+  { label: "Forever", value: "forever" },
+];
+
 export function ChatHeader() {
   const isSoundEnabled = useChatStore((state) => state.isSoundEnabled);
   const setActiveConversationId = useChatStore((state) => state.setActiveConversationId);
   const setSoundEnabled = useChatStore((state) => state.setSoundEnabled);
   const typingUsers = useChatStore((state) => state.typingUsers);
+  const isConversationMuted = useChatStore((state) => state.isConversationMuted);
+  const muteConversation = useChatStore((state) => state.muteConversation);
+  const unmuteConversation = useChatStore((state) => state.unmuteConversation);
 
   const { activeConversation, activeConversationId, isLargeScreen } = useSelectedConversation();
+
+  const [muteMenuOpen, setMuteMenuOpen] = useState(false);
+  const muteMenuRef = useRef(null);
+
+  const isMuted = activeConversationId ? isConversationMuted(activeConversationId) : false;
+
+  useEffect(() => {
+    if (!muteMenuOpen) return;
+    function handleClickOutside(e) {
+      if (muteMenuRef.current && !muteMenuRef.current.contains(e.target)) {
+        setMuteMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [muteMenuOpen]);
+
+  async function handleMuteOption(duration) {
+    setMuteMenuOpen(false);
+    if (!activeConversationId) return;
+    await muteConversation(activeConversationId, duration);
+  }
+
+  async function handleUnmute() {
+    if (!activeConversationId) return;
+    await unmuteConversation(activeConversationId);
+  }
   const isPeerTyping = activeConversationId ? !!typingUsers[activeConversationId] : false;
 
   const getBlockedUsers = useBlockStore((state) => state.getBlockedUsers);
@@ -121,6 +157,48 @@ export function ChatHeader() {
 
         {activeConversation ? (
           <>
+            {/* Mute button */}
+            <div className="relative shrink-0" ref={muteMenuRef}>
+              {isMuted ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  isIconOnly
+                  aria-label="Unmute conversation"
+                  title="Unmute conversation"
+                  onPress={handleUnmute}
+                >
+                  <BellOffIcon className="size-5 text-muted-foreground" strokeWidth={2} aria-hidden />
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  isIconOnly
+                  aria-label="Mute conversation"
+                  title="Mute conversation"
+                  onPress={() => setMuteMenuOpen((v) => !v)}
+                >
+                  <BellIcon className="size-5" strokeWidth={2} aria-hidden />
+                </Button>
+              )}
+
+              {muteMenuOpen && (
+                <div className="absolute right-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-xl border border-border bg-background shadow-lg">
+                  {MUTE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      className="flex w-full items-center px-4 py-2.5 text-left text-sm hover:bg-accent"
+                      onClick={() => handleMuteOption(opt.value)}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <Button
               variant="ghost"
               size="sm"

@@ -76,6 +76,60 @@ export async function getArchivedConversations(req, res) {
   }
 }
 
+export async function getMutedConversations(req, res) {
+  try {
+    const now = new Date();
+    const muted = (req.user.mutedConversations || []).filter(
+      (m) => m.mutedUntil === null || m.mutedUntil > now,
+    );
+    res.status(200).json(muted);
+  } catch (error) {
+    console.error("Error in getMutedConversations:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+export async function muteConversation(req, res) {
+  try {
+    const { id: targetUserId } = req.params;
+    const { duration } = req.body; // "8h" | "1w" | "forever"
+    const loggedInUserId = req.user._id;
+
+    let mutedUntil = null;
+    if (duration === "8h") mutedUntil = new Date(Date.now() + 8 * 60 * 60 * 1000);
+    else if (duration === "1w") mutedUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    // Remove any existing mute entry then insert the new one
+    await User.updateOne(
+      { _id: loggedInUserId },
+      { $pull: { mutedConversations: { userId: targetUserId } } },
+    );
+    await User.updateOne(
+      { _id: loggedInUserId },
+      { $push: { mutedConversations: { userId: targetUserId, mutedUntil } } },
+    );
+
+    res.status(200).json({ mutedUntil });
+  } catch (error) {
+    console.error("Error in muteConversation:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+export async function unmuteConversation(req, res) {
+  try {
+    const { id: targetUserId } = req.params;
+    await User.updateOne(
+      { _id: req.user._id },
+      { $pull: { mutedConversations: { userId: targetUserId } } },
+    );
+    res.status(200).json({ message: "Conversation unmuted" });
+  } catch (error) {
+    console.error("Error in unmuteConversation:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
 export async function archiveConversation(req, res) {
   try {
     const { id: targetUserId } = req.params;
