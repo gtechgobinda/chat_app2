@@ -50,6 +50,12 @@ const messageSchema = new mongoose.Schema(
         emoji:  { type: String, required: true },
       },
     ],
+    replyTo: {
+      messageId:  { type: mongoose.Schema.Types.ObjectId },
+      senderName: { type: String },
+      text:       { type: String },
+      imageUrl:   { type: String },
+    },
   },
   { timestamps: true },
 );

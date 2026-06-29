@@ -435,8 +435,14 @@ export async function editMessage(req, res) {
 
 export async function sendMessage(req, res) {
   try {
-    const { text } = req.body;
+    const { text, replyTo: replyToRaw } = req.body;
     const { id: receiverId } = req.params;
+
+    // replyTo can arrive as a JSON string (FormData) or a plain object (JSON body)
+    let replyTo;
+    if (replyToRaw) {
+      replyTo = typeof replyToRaw === "string" ? JSON.parse(replyToRaw) : replyToRaw;
+    }
     const senderId = req.user._id;
 
     if (!req.user.friends.map(String).includes(String(receiverId))) {
@@ -475,6 +481,7 @@ export async function sendMessage(req, res) {
       image: imageUrl,
       video: videoUrl,
       deliveredAt,
+      replyTo: replyTo || undefined,
     });
 
     await newMessage.save();

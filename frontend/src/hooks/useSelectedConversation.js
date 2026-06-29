@@ -40,6 +40,15 @@ function mapUserToConversation({ user, messages, authUser, onlineUsers }) {
       myReaction:
         message.reactions?.find((r) => String(r.userId) === String(authUser?._id))?.emoji ?? null,
       createdAt: message.createdAt,
+      senderName: role === "me" ? (authUser?.fullName ?? "You") : user.fullName,
+      replyTo: message.replyTo?.messageId
+        ? {
+            messageId: String(message.replyTo.messageId),
+            senderName: message.replyTo.senderName || "",
+            text: message.replyTo.text || "",
+            imageUrl: message.replyTo.imageUrl || null,
+          }
+        : null,
     };
   });
 

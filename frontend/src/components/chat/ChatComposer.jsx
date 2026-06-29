@@ -1,6 +1,6 @@
 import { Button, TextArea } from "@heroui/react";
-import { BanIcon, ImageIcon, LoaderIcon, SendHorizontalIcon } from "lucide-react";
-import { useRef } from "react";
+import { BanIcon, CornerUpLeftIcon, ImageIcon, LoaderIcon, SendHorizontalIcon, XIcon } from "lucide-react";
+import { useEffect, useRef } from "react";
 import useKeyboardSound from "../../hooks/useKeyboardSound";
 import { useChatStore } from "../../store/useChatStore";
 import { useBlockStore } from "../../store/useBlockStore";
@@ -34,8 +34,15 @@ export function ChatComposer() {
   const typingUsers = useChatStore((state) => state.typingUsers);
   const mediaInputRef = useRef(null);
   const typingTimerRef = useRef(null);
+  const textAreaRef = useRef(null);
   const sendTypingEvent = useChatStore((state) => state.sendTypingEvent);
   const sendStopTypingEvent = useChatStore((state) => state.sendStopTypingEvent);
+  const replyToMessage = useChatStore((state) => state.replyToMessage);
+  const clearReplyTo = useChatStore((state) => state.clearReplyTo);
+
+  useEffect(() => {
+    if (replyToMessage) textAreaRef.current?.focus();
+  }, [replyToMessage]);
 
   const isPeerTyping = activeConversationId ? !!typingUsers[activeConversationId] : false;
   const peerName = activeConversation?.peer?.name?.split(" ")[0] ?? "";
@@ -106,6 +113,25 @@ export function ChatComposer() {
     <footer className="shrink-0 border-t border-border">
       {isPeerTyping && <TypingIndicator name={peerName} />}
       <AISuggestions />
+      {replyToMessage && (
+        <div className="flex items-center gap-2 border-b border-border bg-surface/50 px-3 py-2">
+          <CornerUpLeftIcon className="size-4 shrink-0 text-accent" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold text-accent">{replyToMessage.senderName}</p>
+            <p className="truncate text-xs text-muted-foreground">
+              {replyToMessage.imageUrl ? "📷 Photo" : replyToMessage.videoUrl ? "🎥 Video" : replyToMessage.text}
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label="Cancel reply"
+            onClick={clearReplyTo}
+            className="shrink-0 rounded-md p-0.5 hover:bg-accent"
+          >
+            <XIcon className="size-3.5 text-muted-foreground" />
+          </button>
+        </div>
+      )}
       <div className="px-1.5 pb-2 pt-2 sm:px-2">
         {isSendingMedia ? (
           <div className="mx-auto mb-2 flex max-w-full items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-sm text-muted">
@@ -138,6 +164,7 @@ export function ChatComposer() {
             <ImageIcon className="size-5 sm:size-6" strokeWidth={2} />
           </Button>
           <TextArea
+            ref={textAreaRef}
             fullWidth
             variant="secondary"
             placeholder="ChatKoro"

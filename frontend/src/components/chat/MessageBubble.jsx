@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { PencilIcon, PinIcon, PinOffIcon, SmilePlusIcon, TrashIcon } from "lucide-react";
+import { CornerUpLeftIcon, PencilIcon, PinIcon, PinOffIcon, SmilePlusIcon, TrashIcon } from "lucide-react";
 import { withTransform } from "../../lib/imagekit";
 import { MessageVideo } from "./MessageVideo";
 
@@ -113,7 +113,7 @@ function DeleteMenu({ isOwner, onDelete, onClose }) {
 
 // ─── main component ──────────────────────────────────────────────────────────
 
-export function MessageBubble({ message, onEdit, onDelete, onPin, onUnpin, onReact, highlighted }) {
+export function MessageBubble({ message, onEdit, onDelete, onPin, onUnpin, onReact, onReply, highlighted }) {
   const isOwnMessage = message.role === "me";
   const hasImage = Boolean(message.imageUrl);
   const hasVideo = Boolean(message.videoUrl);
@@ -193,6 +193,9 @@ export function MessageBubble({ message, onEdit, onDelete, onPin, onUnpin, onRea
               <PencilIcon className="size-3.5 text-muted-foreground" />
             </button>
           )}
+          <button type="button" title="Reply" className={actionBtn} onClick={() => onReply(message)}>
+            <CornerUpLeftIcon className="size-3.5 text-muted-foreground" />
+          </button>
           <button
             type="button"
             title="React"
@@ -237,6 +240,17 @@ export function MessageBubble({ message, onEdit, onDelete, onPin, onUnpin, onRea
 
         {/* Bubble */}
         <div className={`max-w-[min(90%,28rem)] rounded-2xl px-3 py-2 text-[15px] leading-snug sm:max-w-[min(75%,28rem)] sm:px-3.5 ${isOwnMessage ? "rounded-br-md bg-accent text-accent-foreground" : "rounded-bl-md bg-surface"}`}>
+          {message.replyTo && (
+            <div className={`mb-2 flex flex-col gap-0.5 rounded-lg border-l-2 border-accent/70 px-2.5 py-1.5 ${isOwnMessage ? "bg-black/10" : "bg-black/5 dark:bg-white/10"}`}>
+              <span className="truncate text-[11px] font-semibold text-accent">
+                {message.replyTo.senderName}
+              </span>
+              <span className="truncate text-[12px] opacity-70">
+                {message.replyTo.imageUrl ? "📷 Photo" : message.replyTo.text}
+              </span>
+            </div>
+          )}
+
           {hasImage ? (
             <img src={withTransform(message.imageUrl, IMAGE_TRANSFORM)} alt="" className="mb-1.5 max-h-40 max-w-full rounded-lg object-cover sm:max-h-52 sm:rounded-xl" />
           ) : null}
@@ -295,6 +309,9 @@ export function MessageBubble({ message, onEdit, onDelete, onPin, onUnpin, onRea
       {/* ── Received-message actions (right of bubble) ── */}
       {!isOwnMessage && (
         <div className="flex shrink-0 items-center gap-0.5">
+          <button type="button" title="Reply" className={actionBtn} onClick={() => onReply(message)}>
+            <CornerUpLeftIcon className="size-3.5 text-muted-foreground" />
+          </button>
           <button
             type="button"
             title="React"

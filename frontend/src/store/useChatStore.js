@@ -40,6 +40,7 @@ export const useChatStore = create(
       searchQuery: "",
       sidebarTab: "chats",
       composerText: "",
+      replyToMessage: null,
       isSoundEnabled: true,
       isSendingMedia: false,
       typingUsers: {},
@@ -234,13 +235,30 @@ export const useChatStore = create(
         }
       },
 
+      setReplyTo: (message) => set({ replyToMessage: message }),
+      clearReplyTo: () => set({ replyToMessage: null }),
+
       sendMessage: async (messageData) => {
-        const { selectedUser, messages } = get();
+        const { selectedUser, messages, replyToMessage } = get();
         if (!selectedUser) return false;
+
+        if (replyToMessage) {
+          const replyPayload = {
+            messageId: replyToMessage.id,
+            senderName: replyToMessage.senderName,
+            text: replyToMessage.text || "",
+            imageUrl: replyToMessage.imageUrl || null,
+          };
+          if (messageData instanceof FormData) {
+            messageData.append("replyTo", JSON.stringify(replyPayload));
+          } else {
+            messageData.replyTo = replyPayload;
+          }
+        }
 
         try {
           const res = await axiosInstance.post(`/messages/send/${selectedUser._id}`, messageData);
-          set({ messages: [...messages, res.data], composerText: "" });
+          set({ messages: [...messages, res.data], composerText: "", replyToMessage: null });
           get().getConversations();
           return true;
         } catch (error) {
