@@ -73,6 +73,10 @@ export async function sendMessage(req, res) {
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
 
+    if (!req.user.friends.map(String).includes(String(receiverId))) {
+      return res.status(403).json({ message: "You can only message friends" });
+    }
+
     let imageUrl;
     let videoUrl;
 
