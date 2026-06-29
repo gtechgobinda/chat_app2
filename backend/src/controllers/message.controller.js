@@ -221,6 +221,80 @@ export async function getMessages(req, res) {
 
 const EDIT_WINDOW_MS = 15 * 60 * 1000;
 
+export async function pinMessage(req, res) {
+  try {
+    const { id: messageId } = req.params;
+    const userId = req.user._id;
+
+    const message = await Message.findById(messageId);
+    if (!message) return res.status(404).json({ message: "Message not found" });
+
+    const isParticipant =
+      String(message.senderId) === String(userId) ||
+      String(message.receiverId) === String(userId);
+    if (!isParticipant) return res.status(403).json({ message: "Not authorised" });
+
+    const partnerId =
+      String(message.senderId) === String(userId) ? message.receiverId : message.senderId;
+
+    // Unpin any currently pinned message in this conversation
+    await Message.updateMany(
+      {
+        isPinned: true,
+        $or: [
+          { senderId: userId, receiverId: partnerId },
+          { senderId: partnerId, receiverId: userId },
+        ],
+      },
+      { $set: { isPinned: false } },
+    );
+
+    message.isPinned = true;
+    await message.save();
+
+    const partnerSocketId = getReceiverSocketId(partnerId);
+    if (partnerSocketId) {
+      io.to(partnerSocketId).emit("messagePinned", { messageId: message._id });
+    }
+
+    res.status(200).json(message);
+  } catch (error) {
+    console.error("Error in pinMessage:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+export async function unpinMessage(req, res) {
+  try {
+    const { id: messageId } = req.params;
+    const userId = req.user._id;
+
+    const message = await Message.findById(messageId);
+    if (!message) return res.status(404).json({ message: "Message not found" });
+
+    const isParticipant =
+      String(message.senderId) === String(userId) ||
+      String(message.receiverId) === String(userId);
+    if (!isParticipant) return res.status(403).json({ message: "Not authorised" });
+
+    const partnerId =
+      String(message.senderId) === String(userId) ? message.receiverId : message.senderId;
+
+    message.isPinned = false;
+    await message.save();
+
+    const partnerSocketId = getReceiverSocketId(partnerId);
+    if (partnerSocketId) {
+      io.to(partnerSocketId).emit("messageUnpinned", { messageId: message._id });
+    }
+
+    res.status(200).json(message);
+  } catch (error) {
+    console.error("Error in unpinMessage:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
 export async function deleteMessage(req, res) {
   try {
     const { id: messageId } = req.params;

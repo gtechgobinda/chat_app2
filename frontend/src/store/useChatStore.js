@@ -150,6 +150,37 @@ export const useChatStore = create(
         }
       },
 
+      pinMessage: async (messageId) => {
+        try {
+          await axiosInstance.post(`/messages/${messageId}/pin`);
+          set((state) => ({
+            messages: state.messages.map((m) => ({
+              ...m,
+              isPinned: String(m._id) === String(messageId),
+            })),
+          }));
+          return true;
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to pin message");
+          return false;
+        }
+      },
+
+      unpinMessage: async (messageId) => {
+        try {
+          await axiosInstance.delete(`/messages/${messageId}/pin`);
+          set((state) => ({
+            messages: state.messages.map((m) =>
+              String(m._id) === String(messageId) ? { ...m, isPinned: false } : m,
+            ),
+          }));
+          return true;
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to unpin message");
+          return false;
+        }
+      },
+
       deleteMessage: async (messageId, scope) => {
         try {
           await axiosInstance.delete(`/messages/${messageId}`, { data: { scope } });
@@ -286,6 +317,25 @@ export const useChatStore = create(
             ),
           }));
         });
+
+        socket.off("messagePinned");
+        socket.on("messagePinned", ({ messageId }) => {
+          set((state) => ({
+            messages: state.messages.map((m) => ({
+              ...m,
+              isPinned: String(m._id) === String(messageId),
+            })),
+          }));
+        });
+
+        socket.off("messageUnpinned");
+        socket.on("messageUnpinned", ({ messageId }) => {
+          set((state) => ({
+            messages: state.messages.map((m) =>
+              String(m._id) === String(messageId) ? { ...m, isPinned: false } : m,
+            ),
+          }));
+        });
       },
 
       unsubscribeFromMessages: () => {
@@ -297,6 +347,8 @@ export const useChatStore = create(
         socket?.off("messagesRead");
         socket?.off("messageEdited");
         socket?.off("messageDeleted");
+        socket?.off("messagePinned");
+        socket?.off("messageUnpinned");
       },
 
       markMessagesAsRead: (senderId) => {

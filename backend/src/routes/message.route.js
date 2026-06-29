@@ -10,6 +10,8 @@ import {
   getMessages,
   editMessage,
   deleteMessage,
+  pinMessage,
+  unpinMessage,
   getUsersForSidebar,
   sendMessage,
 } from "../controllers/message.controller.js";
@@ -31,6 +33,8 @@ router.delete("/mute/:id", unmuteConversation);
 router.get("/:id", getMessages);
 router.patch("/:id", editMessage);
 router.delete("/:id", deleteMessage);
+router.post("/:id/pin", pinMessage);
+router.delete("/:id/pin", unpinMessage);
 router.post("/send/:id", upload.single("media"), sendMessage);
 
 export default router;

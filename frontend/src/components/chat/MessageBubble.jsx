@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { PencilIcon, TrashIcon } from "lucide-react";
+import { PencilIcon, PinIcon, PinOffIcon, TrashIcon } from "lucide-react";
 import { withTransform } from "../../lib/imagekit";
 import { MessageVideo } from "./MessageVideo";
 
@@ -47,7 +47,7 @@ function DeleteMenu({ isOwner, onDelete, onClose }) {
       {isOwner && (
         <button
           type="button"
-          className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-destructive hover:bg-accent"
+          className="flex w-full items-center px-4 py-2.5 text-left text-sm text-destructive hover:bg-accent"
           onClick={() => { onDelete("everyone"); onClose(); }}
         >
           Delete for everyone
@@ -55,7 +55,7 @@ function DeleteMenu({ isOwner, onDelete, onClose }) {
       )}
       <button
         type="button"
-        className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-accent"
+        className="flex w-full items-center px-4 py-2.5 text-left text-sm hover:bg-accent"
         onClick={() => { onDelete("me"); onClose(); }}
       >
         Delete for me
@@ -64,7 +64,7 @@ function DeleteMenu({ isOwner, onDelete, onClose }) {
   );
 }
 
-export function MessageBubble({ message, onEdit, onDelete }) {
+export function MessageBubble({ message, onEdit, onDelete, onPin, onUnpin, highlighted }) {
   const isOwnMessage = message.role === "me";
   const hasImage = Boolean(message.imageUrl);
   const hasVideo = Boolean(message.videoUrl);
@@ -106,11 +106,16 @@ export function MessageBubble({ message, onEdit, onDelete }) {
     else if (e.key === "Escape") cancelEditing();
   }
 
-  const actionBtn = "mb-1 shrink-0 rounded-md p-1 opacity-0 transition-opacity hover:bg-accent group-hover/bubble:opacity-100";
+  const actionBtn =
+    "mb-1 shrink-0 rounded-md p-1 opacity-0 transition-opacity hover:bg-accent group-hover/bubble:opacity-100";
+
+  const highlightClass = highlighted
+    ? "ring-2 ring-accent ring-offset-1 rounded-2xl transition-all duration-300"
+    : "";
 
   if (message.isDeletedForEveryone) {
     return (
-      <div className={`flex w-full ${isOwnMessage ? "justify-end" : "justify-start"}`}>
+      <div data-message-id={message.id} className={`flex w-full ${isOwnMessage ? "justify-end" : "justify-start"} ${highlightClass}`}>
         <div
           className={`max-w-[min(90%,28rem)] rounded-2xl px-3 py-2 text-[15px] leading-snug sm:max-w-[min(75%,28rem)] sm:px-3.5 ${
             isOwnMessage ? "rounded-br-md bg-accent/40" : "rounded-bl-md bg-surface"
@@ -127,9 +132,11 @@ export function MessageBubble({ message, onEdit, onDelete }) {
   }
 
   return (
-    <div className={`group/bubble flex w-full items-end gap-1 ${isOwnMessage ? "justify-end" : "justify-start"}`}>
-
-      {/* Own-message actions: pencil + trash, left of bubble */}
+    <div
+      data-message-id={message.id}
+      className={`group/bubble flex w-full items-end gap-1 ${isOwnMessage ? "justify-end" : "justify-start"} ${highlightClass}`}
+    >
+      {/* Own-message actions: left of bubble */}
       {isOwnMessage && !isEditing && (
         <div className="flex shrink-0 items-center gap-0.5">
           {canEdit && (
@@ -137,13 +144,20 @@ export function MessageBubble({ message, onEdit, onDelete }) {
               <PencilIcon className="size-3.5 text-muted-foreground" />
             </button>
           )}
+          {/* Pin / Unpin */}
+          <button
+            type="button"
+            title={message.isPinned ? "Unpin message" : "Pin message"}
+            className={actionBtn}
+            onClick={() => message.isPinned ? onUnpin(message.id) : onPin(message.id)}
+          >
+            {message.isPinned
+              ? <PinOffIcon className="size-3.5 text-accent" />
+              : <PinIcon className="size-3.5 text-muted-foreground" />}
+          </button>
+          {/* Delete */}
           <div className="relative">
-            <button
-              type="button"
-              onClick={() => setDeleteMenuOpen((v) => !v)}
-              title="Delete message"
-              className={actionBtn}
-            >
+            <button type="button" onClick={() => setDeleteMenuOpen((v) => !v)} title="Delete message" className={actionBtn}>
               <TrashIcon className="size-3.5 text-muted-foreground" />
             </button>
             {deleteMenuOpen && (
@@ -200,23 +214,31 @@ export function MessageBubble({ message, onEdit, onDelete }) {
         </p>
       </div>
 
-      {/* Received-message action: trash, right of bubble */}
+      {/* Received-message actions: right of bubble */}
       {!isOwnMessage && (
-        <div className="relative">
+        <div className="flex shrink-0 items-center gap-0.5">
+          {/* Pin / Unpin */}
           <button
             type="button"
-            onClick={() => setDeleteMenuOpen((v) => !v)}
-            title="Remove from your chat"
+            title={message.isPinned ? "Unpin message" : "Pin message"}
             className={actionBtn}
+            onClick={() => message.isPinned ? onUnpin(message.id) : onPin(message.id)}
           >
-            <TrashIcon className="size-3.5 text-muted-foreground" />
+            {message.isPinned
+              ? <PinOffIcon className="size-3.5 text-accent" />
+              : <PinIcon className="size-3.5 text-muted-foreground" />}
           </button>
-          {deleteMenuOpen && (
-            <DeleteMenu isOwner={false} onDelete={(scope) => onDelete(message.id, scope)} onClose={() => setDeleteMenuOpen(false)} />
-          )}
+          {/* Delete */}
+          <div className="relative">
+            <button type="button" onClick={() => setDeleteMenuOpen((v) => !v)} title="Remove from your chat" className={actionBtn}>
+              <TrashIcon className="size-3.5 text-muted-foreground" />
+            </button>
+            {deleteMenuOpen && (
+              <DeleteMenu isOwner={false} onDelete={(scope) => onDelete(message.id, scope)} onClose={() => setDeleteMenuOpen(false)} />
+            )}
+          </div>
         </div>
       )}
-
     </div>
   );
 }

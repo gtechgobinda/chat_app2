@@ -32,6 +32,7 @@ function mapUserToConversation({ user, messages, authUser, onlineUsers }) {
       status,
       isEdited: Boolean(message.editedAt),
       isDeletedForEveryone: Boolean(message.deletedForEveryone),
+      isPinned: Boolean(message.isPinned),
       createdAt: message.createdAt,
     };
   });
