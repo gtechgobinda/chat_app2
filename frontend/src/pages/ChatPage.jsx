@@ -32,15 +32,19 @@ function ChatPage() {
     getStarredMessages();
   }, [getConversations, getArchivedConversations, getMutedConversations, getUsers, getStarredMessages]);
 
-  // Safety-net: if users list is empty after the initial load (e.g. race condition where
-  // the Clerk webhook fires after the first getUsers() call), retry up to 3 times.
+  // Safety-net: if users list is still empty after the initial load completes (e.g. another
+  // user's Clerk webhook fires after our first getUsers() call), retry a few times.
+  // loadedOnce prevents the effect from firing before the initial getUsers() even starts,
+  // which was causing retryRef to increment on the very first render (wrong timing).
+  const loadedOnce = useRef(false);
   const retryRef = useRef(0);
   useEffect(() => {
-    if (isUsersLoading) return;
+    if (isUsersLoading) { loadedOnce.current = true; return; }
+    if (!loadedOnce.current) return; // initial load hasn't started yet
     if (users.length > 0) { retryRef.current = 0; return; }
     if (retryRef.current >= 3) return;
     retryRef.current += 1;
-    const delay = retryRef.current * 2000; // 2s, 4s, 6s
+    const delay = retryRef.current * 1500; // 1.5s, 3s, 4.5s
     const timer = setTimeout(getUsers, delay);
     return () => clearTimeout(timer);
   }, [users, isUsersLoading, getUsers]);

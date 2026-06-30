@@ -50,16 +50,33 @@ export const useChatStore = create(
       getUsers: async () => {
         set({ isUsersLoading: true });
         try {
-          const res = await axiosInstance.get("/messages/users");
-          set((state) => ({
-            users: res.data,
-            selectedUser:
-              state.selectedUser && res.data.some((user) => user._id === state.selectedUser._id)
-                ? state.selectedUser
-                : null,
-          }));
-        } catch (error) {
-          console.log("Error in get Users", error.message);
+          const MAX_RETRIES = 3;
+          let lastError;
+          for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            if (attempt > 0) {
+              // 800ms, 1.6s, 2.4s — short enough that the spinner stays visible
+              await new Promise((r) => setTimeout(r, attempt * 800));
+            }
+            try {
+              const res = await axiosInstance.get("/messages/users");
+              set((state) => ({
+                users: res.data,
+                selectedUser:
+                  state.selectedUser &&
+                  res.data.some((user) => user._id === state.selectedUser._id)
+                    ? state.selectedUser
+                    : null,
+              }));
+              return; // success — finally will still run
+            } catch (error) {
+              lastError = error;
+              const isTransient =
+                !error.response ||
+                [401, 404, 500, 502, 503].includes(error.response?.status);
+              if (!isTransient) break;
+            }
+          }
+          if (lastError) console.log("Error in getUsers:", lastError.message);
         } finally {
           set({ isUsersLoading: false });
         }
