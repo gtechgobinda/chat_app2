@@ -41,12 +41,24 @@ export const useFriendStore = create((set, get) => ({
   },
 
   sendFriendRequest: async (userId) => {
+    // Optimistic update — flip to Pending immediately before the API responds
+    const optimisticId = `optimistic-${userId}`;
+    set((state) => ({
+      sentRequests: [{ _id: optimisticId, receiverId: { _id: userId }, status: "pending" }, ...state.sentRequests],
+    }));
     try {
       const res = await axiosInstance.post(`/friends/request/${userId}`);
-      set((state) => ({ sentRequests: [res.data, ...state.sentRequests] }));
+      // Swap the placeholder for the real request object
+      set((state) => ({
+        sentRequests: state.sentRequests.map((r) => (r._id === optimisticId ? res.data : r)),
+      }));
       toast.success("Friend request sent!");
       return true;
     } catch (error) {
+      // Revert if the API call fails
+      set((state) => ({
+        sentRequests: state.sentRequests.filter((r) => r._id !== optimisticId),
+      }));
       toast.error(error.response?.data?.message || "Failed to send request");
       return false;
     }
