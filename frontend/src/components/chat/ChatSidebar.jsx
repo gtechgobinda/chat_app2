@@ -198,17 +198,6 @@ function ChatSidebar() {
             </p>
           ) : (
             <>
-              {filteredConversations.map((conversation) => (
-                <ConversationRow
-                  key={conversation.id}
-                  user={conversation}
-                  selected={conversation.id === activeConversationId}
-                  onSelect={() => setActiveConversationId(conversation.id)}
-                  onArchive={archiveConversation}
-                  isMuted={isConversationMuted(conversation.id)}
-                />
-              ))}
-
               {filteredArchived.length > 0 && (
                 <div>
                   <button
@@ -241,6 +230,17 @@ function ChatSidebar() {
                     ))}
                 </div>
               )}
+
+              {filteredConversations.map((conversation) => (
+                <ConversationRow
+                  key={conversation.id}
+                  user={conversation}
+                  selected={conversation.id === activeConversationId}
+                  onSelect={() => setActiveConversationId(conversation.id)}
+                  onArchive={archiveConversation}
+                  isMuted={isConversationMuted(conversation.id)}
+                />
+              ))}
             </>
           )}
         </Tabs.Panel>
