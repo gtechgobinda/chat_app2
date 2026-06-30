@@ -18,19 +18,27 @@ export async function sendFriendRequest(req, res) {
       return res.status(400).json({ message: "Already friends" });
     }
 
-    const existing = await FriendRequest.findOne({
+    // Block if a pending request already exists in either direction
+    const alreadyPending = await FriendRequest.findOne({
       $or: [
-        { senderId, receiverId },
-        { senderId: receiverId, receiverId: senderId },
+        { senderId, receiverId, status: "pending" },
+        { senderId: receiverId, receiverId: senderId, status: "pending" },
       ],
-      status: "pending",
     });
-
-    if (existing) {
+    if (alreadyPending) {
       return res.status(400).json({ message: "Friend request already pending" });
     }
 
-    const friendRequest = await FriendRequest.create({ senderId, receiverId });
+    // If this pair had a rejected request before, reset it — avoids the unique-index conflict
+    let friendRequest = await FriendRequest.findOneAndUpdate(
+      { senderId, receiverId, status: "rejected" },
+      { $set: { status: "pending" } },
+      { new: true },
+    );
+
+    if (!friendRequest) {
+      friendRequest = await FriendRequest.create({ senderId, receiverId });
+    }
 
     const populatedRequest = await FriendRequest.findById(friendRequest._id)
       .populate("senderId", "-clerkId")
@@ -43,9 +51,6 @@ export async function sendFriendRequest(req, res) {
 
     res.status(201).json(populatedRequest);
   } catch (error) {
-    if (error.code === 11000) {
-      return res.status(400).json({ message: "Friend request already sent" });
-    }
     console.error("Error in sendFriendRequest:", error.message);
     res.status(500).json({ message: "Internal server error" });
   }
