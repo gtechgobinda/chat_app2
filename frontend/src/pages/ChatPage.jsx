@@ -1,7 +1,7 @@
 import { useWallpaper } from "../context/wallpaper";
 import { useChatStore } from "../store/useChatStore";
 import { useSelectedConversation } from "../hooks/useSelectedConversation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import ChatSidebar from "../components/chat/ChatSidebar";
 import { ChatHeader } from "../components/chat/ChatHeader";
 import { MessageList } from "../components/chat/MessageList";
@@ -16,6 +16,8 @@ function ChatPage() {
   const getMutedConversations = useChatStore((state) => state.getMutedConversations);
   const getMessages = useChatStore((state) => state.getMessages);
   const getUsers = useChatStore((state) => state.getUsers);
+  const users = useChatStore((state) => state.users);
+  const isUsersLoading = useChatStore((state) => state.isUsersLoading);
   const subscribeToMessages = useChatStore((state) => state.subscribeToMessages);
   const unsubscribeFromMessages = useChatStore((state) => state.unsubscribeFromMessages);
   const getStarredMessages = useChatStore((state) => state.getStarredMessages);
@@ -29,6 +31,19 @@ function ChatPage() {
     getMutedConversations();
     getStarredMessages();
   }, [getConversations, getArchivedConversations, getMutedConversations, getUsers, getStarredMessages]);
+
+  // Safety-net: if users list is empty after the initial load (e.g. race condition where
+  // the Clerk webhook fires after the first getUsers() call), retry up to 3 times.
+  const retryRef = useRef(0);
+  useEffect(() => {
+    if (isUsersLoading) return;
+    if (users.length > 0) { retryRef.current = 0; return; }
+    if (retryRef.current >= 3) return;
+    retryRef.current += 1;
+    const delay = retryRef.current * 2000; // 2s, 4s, 6s
+    const timer = setTimeout(getUsers, delay);
+    return () => clearTimeout(timer);
+  }, [users, isUsersLoading, getUsers]);
 
   useEffect(() => {
     // Subscribe even without an active conversation so incoming messages

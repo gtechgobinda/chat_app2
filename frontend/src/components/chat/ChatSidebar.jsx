@@ -35,6 +35,7 @@ function ChatSidebar() {
   const archiveConversation = useChatStore((state) => state.archiveConversation);
   const unarchiveConversation = useChatStore((state) => state.unarchiveConversation);
   const mutedConversations = useChatStore((state) => state.mutedConversations);
+  const isUsersLoading = useChatStore((state) => state.isUsersLoading);
 
   function isConversationMuted(userId) {
     const entry = mutedConversations.find((m) => String(m.userId) === String(userId));
@@ -247,7 +248,11 @@ function ChatSidebar() {
         <Tabs.Panel id="users" className="flex-1 overflow-x-hidden overflow-y-auto outline-none">
           {filteredUsers.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-muted">
-              No people match your search.
+              {normalizedSearchQuery
+                ? "No people match your search."
+                : isUsersLoading
+                  ? "Loading users…"
+                  : "No other users found."}
             </p>
           ) : (
             filteredUsers.map((user) => (
