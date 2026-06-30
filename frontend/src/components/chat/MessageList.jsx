@@ -14,6 +14,8 @@ export function MessageList() {
   const unpinMessage = useChatStore((state) => state.unpinMessage);
   const reactToMessage = useChatStore((state) => state.reactToMessage);
   const setReplyTo = useChatStore((state) => state.setReplyTo);
+  const starMessage = useChatStore((state) => state.starMessage);
+  const unstarMessage = useChatStore((state) => state.unstarMessage);
 
   const [highlightedMessageId, setHighlightedMessageId] = useState(null);
 
@@ -59,6 +61,8 @@ export function MessageList() {
                 onUnpin={unpinMessage}
                 onReact={reactToMessage}
                 onReply={setReplyTo}
+                onStar={starMessage}
+                onUnstar={unstarMessage}
                 highlighted={message.id === highlightedMessageId}
               />
             ))}

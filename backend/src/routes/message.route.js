@@ -15,6 +15,9 @@ import {
   unpinMessage,
   getUsersForSidebar,
   sendMessage,
+  getStarredMessages,
+  starMessage,
+  unstarMessage,
 } from "../controllers/message.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 import { upload } from "../middleware/upload.middleware.js";
@@ -31,6 +34,9 @@ router.delete("/archive/:id", unarchiveConversation);
 router.get("/muted", getMutedConversations);
 router.post("/mute/:id", muteConversation);
 router.delete("/mute/:id", unmuteConversation);
+router.get("/starred", getStarredMessages);
+router.post("/:id/star", starMessage);
+router.delete("/:id/star", unstarMessage);
 router.get("/:id", getMessages);
 router.patch("/:id", editMessage);
 router.delete("/:id", deleteMessage);

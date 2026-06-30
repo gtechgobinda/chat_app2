@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Avatar, Button } from "@heroui/react";
-import { BanIcon, BellIcon, BellOffIcon, ChevronLeftIcon, Volume2Icon, VolumeXIcon, XIcon } from "lucide-react";
+import { BanIcon, BellIcon, BellOffIcon, BookmarkIcon, ChevronLeftIcon, Volume2Icon, VolumeXIcon, XIcon } from "lucide-react";
 import { AppLogo } from "../AppLogo";
 import { AvatarWithOnlineIndicator } from "./AvatarWithOnlineIndicator";
 
@@ -27,6 +27,8 @@ export function ChatHeader() {
   const mutedConversations = useChatStore((state) => state.mutedConversations);
   const muteConversation = useChatStore((state) => state.muteConversation);
   const unmuteConversation = useChatStore((state) => state.unmuteConversation);
+  const starredPanelOpen = useChatStore((state) => state.starredPanelOpen);
+  const setStarredPanelOpen = useChatStore((state) => state.setStarredPanelOpen);
 
   const { activeConversation, activeConversationId, isLargeScreen } = useSelectedConversation();
 
@@ -160,6 +162,23 @@ export function ChatHeader() {
           ) : (
             <VolumeXIcon className="size-5.5" strokeWidth={2} aria-hidden />
           )}
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          isIconOnly
+          className="shrink-0"
+          aria-label="Starred messages"
+          title="Starred messages"
+          aria-pressed={starredPanelOpen}
+          onPress={() => setStarredPanelOpen(!starredPanelOpen)}
+        >
+          <BookmarkIcon
+            className={`size-5 ${starredPanelOpen ? "fill-accent text-accent" : ""}`}
+            strokeWidth={2}
+            aria-hidden
+          />
         </Button>
 
         {activeConversation ? (

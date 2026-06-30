@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CornerUpLeftIcon, PencilIcon, PinIcon, PinOffIcon, SmilePlusIcon, TrashIcon } from "lucide-react";
+import { BookmarkIcon, CornerUpLeftIcon, PencilIcon, PinIcon, PinOffIcon, SmilePlusIcon, TrashIcon } from "lucide-react";
 import { withTransform } from "../../lib/imagekit";
 import { MessageVideo } from "./MessageVideo";
 
@@ -113,7 +113,7 @@ function DeleteMenu({ isOwner, onDelete, onClose }) {
 
 // ─── main component ──────────────────────────────────────────────────────────
 
-export function MessageBubble({ message, onEdit, onDelete, onPin, onUnpin, onReact, onReply, highlighted }) {
+export function MessageBubble({ message, onEdit, onDelete, onPin, onUnpin, onReact, onReply, onStar, onUnstar, highlighted }) {
   const isOwnMessage = message.role === "me";
   const hasImage = Boolean(message.imageUrl);
   const hasVideo = Boolean(message.videoUrl);
@@ -213,6 +213,16 @@ export function MessageBubble({ message, onEdit, onDelete, onPin, onUnpin, onRea
             {message.isPinned
               ? <PinOffIcon className="size-3.5 text-accent" />
               : <PinIcon className="size-3.5 text-muted-foreground" />}
+          </button>
+          <button
+            type="button"
+            title={message.isStarred ? "Unstar" : "Star"}
+            className={actionBtn}
+            onClick={() => (message.isStarred ? onUnstar(message.id) : onStar(message.id))}
+          >
+            <BookmarkIcon
+              className={`size-3.5 ${message.isStarred ? "fill-accent text-accent" : "text-muted-foreground"}`}
+            />
           </button>
           <div className="relative">
             <button type="button" title="Delete" className={actionBtn} onClick={() => setDeleteMenuOpen((v) => !v)}>
@@ -329,6 +339,16 @@ export function MessageBubble({ message, onEdit, onDelete, onPin, onUnpin, onRea
             {message.isPinned
               ? <PinOffIcon className="size-3.5 text-accent" />
               : <PinIcon className="size-3.5 text-muted-foreground" />}
+          </button>
+          <button
+            type="button"
+            title={message.isStarred ? "Unstar" : "Star"}
+            className={actionBtn}
+            onClick={() => (message.isStarred ? onUnstar(message.id) : onStar(message.id))}
+          >
+            <BookmarkIcon
+              className={`size-3.5 ${message.isStarred ? "fill-accent text-accent" : "text-muted-foreground"}`}
+            />
           </button>
           <div className="relative">
             <button type="button" title="Remove from chat" className={actionBtn} onClick={() => setDeleteMenuOpen((v) => !v)}>

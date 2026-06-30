@@ -433,6 +433,65 @@ export async function editMessage(req, res) {
   }
 }
 
+export async function getStarredMessages(req, res) {
+  try {
+    const userId = req.user._id;
+    const starredIds = req.user.starredMessages || [];
+
+    if (starredIds.length === 0) return res.status(200).json([]);
+
+    const messages = await Message.find({
+      _id: { $in: starredIds },
+      deletedForEveryone: { $ne: true },
+      deletedFor: { $nin: [userId] },
+    })
+      .populate("senderId", "fullName profilePic")
+      .populate("receiverId", "fullName profilePic")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(messages);
+  } catch (error) {
+    console.error("Error in getStarredMessages:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+export async function starMessage(req, res) {
+  try {
+    const { id: messageId } = req.params;
+    const userId = req.user._id;
+
+    const message = await Message.findById(messageId);
+    if (!message) return res.status(404).json({ message: "Message not found" });
+
+    const isParticipant =
+      String(message.senderId) === String(userId) ||
+      String(message.receiverId) === String(userId);
+    if (!isParticipant) return res.status(403).json({ message: "Not authorised" });
+
+    await User.updateOne({ _id: userId }, { $addToSet: { starredMessages: messageId } });
+
+    res.status(200).json({ message: "Message starred" });
+  } catch (error) {
+    console.error("Error in starMessage:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+export async function unstarMessage(req, res) {
+  try {
+    const { id: messageId } = req.params;
+    const userId = req.user._id;
+
+    await User.updateOne({ _id: userId }, { $pull: { starredMessages: messageId } });
+
+    res.status(200).json({ message: "Message unstarred" });
+  } catch (error) {
+    console.error("Error in unstarMessage:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
 export async function sendMessage(req, res) {
   try {
     const { text, replyTo: replyToRaw } = req.body;

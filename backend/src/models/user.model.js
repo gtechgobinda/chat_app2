@@ -44,6 +44,12 @@ const userSchema = new mongoose.Schema(
         mutedUntil: { type: Date, default: null }, // null = muted forever
       },
     ],
+    starredMessages: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Message",
+      },
+    ],
     lastSeen: {
       type: Date,
       default: null,

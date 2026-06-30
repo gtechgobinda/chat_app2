@@ -6,6 +6,7 @@ import ChatSidebar from "../components/chat/ChatSidebar";
 import { ChatHeader } from "../components/chat/ChatHeader";
 import { MessageList } from "../components/chat/MessageList";
 import { ChatComposer } from "../components/chat/ChatComposer";
+import { StarredMessagesPanel } from "../components/chat/StarredMessagesPanel";
 
 function ChatPage() {
   const { frameStyle } = useWallpaper();
@@ -17,6 +18,7 @@ function ChatPage() {
   const getUsers = useChatStore((state) => state.getUsers);
   const subscribeToMessages = useChatStore((state) => state.subscribeToMessages);
   const unsubscribeFromMessages = useChatStore((state) => state.unsubscribeFromMessages);
+  const getStarredMessages = useChatStore((state) => state.getStarredMessages);
 
   const { activeConversation, activeConversationId, isLargeScreen } = useSelectedConversation();
 
@@ -25,7 +27,8 @@ function ChatPage() {
     getConversations();
     getArchivedConversations();
     getMutedConversations();
-  }, [getConversations, getArchivedConversations, getMutedConversations, getUsers]);
+    getStarredMessages();
+  }, [getConversations, getArchivedConversations, getMutedConversations, getUsers, getStarredMessages]);
 
   useEffect(() => {
     if (!activeConversationId) return;
@@ -43,14 +46,14 @@ function ChatPage() {
         <ChatSidebar />
 
         <div
-          className={`flex-1 flex-col overflow-hidden ${
+          className={`relative flex-1 flex-col overflow-hidden ${
             !isLargeScreen && !activeConversationId ? "hidden lg:flex" : "flex"
           }`}
         >
           <ChatHeader />
           <MessageList />
-
           {activeConversation ? <ChatComposer /> : null}
+          <StarredMessagesPanel />
         </div>
       </div>
     </div>

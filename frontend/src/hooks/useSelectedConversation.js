@@ -18,7 +18,7 @@ export function getInitials(name) {
 // 1. Messages → UI messages
 // 2. User → peer
 
-function mapUserToConversation({ user, messages, authUser, onlineUsers }) {
+function mapUserToConversation({ user, messages, authUser, onlineUsers, starredIds }) {
   const mappedMessages = messages.map((message) => {
     const role = String(message.senderId) === String(authUser?._id) ? "me" : "them";
     const status = message.readAt ? "read" : message.deliveredAt ? "delivered" : "sent";
@@ -33,6 +33,7 @@ function mapUserToConversation({ user, messages, authUser, onlineUsers }) {
       isEdited: Boolean(message.editedAt),
       isDeletedForEveryone: Boolean(message.deletedForEveryone),
       isPinned: Boolean(message.isPinned),
+      isStarred: starredIds ? starredIds.has(String(message._id)) : false,
       reactions: (message.reactions || []).map((r) => ({
         userId: String(r.userId),
         emoji: r.emoji,
@@ -71,11 +72,14 @@ export function useSelectedConversation() {
   const conversations = useChatStore((state) => state.conversations);
   const users = useChatStore((state) => state.users);
   const messages = useChatStore((state) => state.messages);
+  const starredMessages = useChatStore((state) => state.starredMessages);
 
   const authUser = useAuthStore((state) => state.authUser);
   const onlineUsers = useAuthStore((state) => state.onlineUsers);
 
   const isLargeScreen = useMediaQuery("(min-width: 1024px)");
+
+  const starredIds = new Set(starredMessages.map((m) => String(m._id)));
 
   const selectedUser = activeConversationId
     ? users.find((user) => user._id === activeConversationId) ||
@@ -83,7 +87,7 @@ export function useSelectedConversation() {
     : null;
 
   const activeConversation = selectedUser
-    ? mapUserToConversation({ user: selectedUser, messages, authUser, onlineUsers })
+    ? mapUserToConversation({ user: selectedUser, messages, authUser, onlineUsers, starredIds })
     : null;
 
   return {

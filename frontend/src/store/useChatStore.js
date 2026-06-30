@@ -44,6 +44,8 @@ export const useChatStore = create(
       isSoundEnabled: true,
       isSendingMedia: false,
       typingUsers: {},
+      starredMessages: [],
+      starredPanelOpen: false,
 
       getUsers: async () => {
         set({ isUsersLoading: true });
@@ -234,6 +236,39 @@ export const useChatStore = create(
           return false;
         }
       },
+
+      getStarredMessages: async () => {
+        try {
+          const res = await axiosInstance.get("/messages/starred");
+          set({ starredMessages: res.data });
+        } catch (error) {
+          console.log("Error in getStarredMessages", error.message);
+        }
+      },
+
+      starMessage: async (messageId) => {
+        try {
+          await axiosInstance.post(`/messages/${messageId}/star`);
+          await get().getStarredMessages();
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to star message");
+        }
+      },
+
+      unstarMessage: async (messageId) => {
+        try {
+          await axiosInstance.delete(`/messages/${messageId}/star`);
+          set((state) => ({
+            starredMessages: state.starredMessages.filter(
+              (m) => String(m._id) !== String(messageId),
+            ),
+          }));
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to unstar message");
+        }
+      },
+
+      setStarredPanelOpen: (open) => set({ starredPanelOpen: open }),
 
       setReplyTo: (message) => set({ replyToMessage: message }),
       clearReplyTo: () => set({ replyToMessage: null }),
