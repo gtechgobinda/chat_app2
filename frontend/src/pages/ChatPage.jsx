@@ -31,12 +31,14 @@ function ChatPage() {
   }, [getConversations, getArchivedConversations, getMutedConversations, getUsers, getStarredMessages]);
 
   useEffect(() => {
-    if (!activeConversationId) return;
+    // Subscribe even without an active conversation so incoming messages
+    // always refresh the conversations list (fixes "first message needs refresh" bug).
+    subscribeToMessages(activeConversationId ?? null);
 
-    getMessages(activeConversationId);
-    subscribeToMessages(activeConversationId);
+    if (activeConversationId) {
+      getMessages(activeConversationId);
+    }
 
-    // cleanup
     return () => unsubscribeFromMessages();
   }, [getMessages, activeConversationId, subscribeToMessages, unsubscribeFromMessages]);
 

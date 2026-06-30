@@ -86,8 +86,13 @@ export async function respondToFriendRequest(req, res) {
       const senderSocketId = getReceiverSocketId(String(friendRequest.senderId));
       if (senderSocketId) {
         io.to(senderSocketId).emit("friendRequestAccepted", {
-          requestId: friendRequest._id,
-          newFriend: req.user,
+          requestId: String(friendRequest._id),
+          newFriend: {
+            _id: String(req.user._id),
+            fullName: req.user.fullName,
+            profilePic: req.user.profilePic,
+            email: req.user.email,
+          },
         });
       }
     } else {

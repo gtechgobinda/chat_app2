@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "./useAuthStore";
+import { useChatStore } from "./useChatStore";
 import toast from "react-hot-toast";
 
 export const useFriendStore = create((set, get) => ({
@@ -55,9 +56,9 @@ export const useFriendStore = create((set, get) => ({
     try {
       await axiosInstance.post(`/friends/respond/${requestId}`, { action });
 
-      const request = get().receivedRequests.find((r) => r._id === requestId);
+      const request = get().receivedRequests.find((r) => String(r._id) === String(requestId));
       set((state) => ({
-        receivedRequests: state.receivedRequests.filter((r) => r._id !== requestId),
+        receivedRequests: state.receivedRequests.filter((r) => String(r._id) !== String(requestId)),
         friends:
           action === "accept" && request
             ? [...state.friends, request.senderId]
@@ -66,6 +67,10 @@ export const useFriendStore = create((set, get) => ({
 
       if (action === "accept") {
         toast.success("Friend request accepted!");
+        // Refresh friends and chat data so the new friend appears immediately
+        get().getFriends();
+        useChatStore.getState().getUsers();
+        useChatStore.getState().getConversations();
       }
       return true;
     } catch (error) {
@@ -86,10 +91,16 @@ export const useFriendStore = create((set, get) => ({
 
     socket.off("friendRequestAccepted");
     socket.on("friendRequestAccepted", ({ requestId, newFriend }) => {
+      // Optimistic update with safe String() ID comparison
       set((state) => ({
-        sentRequests: state.sentRequests.filter((r) => r._id !== requestId),
+        sentRequests: state.sentRequests.filter((r) => String(r._id) !== String(requestId)),
         friends: [...state.friends, newFriend],
       }));
+      // Sync from server to guarantee accuracy (avoids any ID format mismatch)
+      get().getSentRequests();
+      get().getFriends();
+      useChatStore.getState().getUsers();
+      useChatStore.getState().getConversations();
       toast.success(`${newFriend.fullName} accepted your friend request!`);
     });
   },

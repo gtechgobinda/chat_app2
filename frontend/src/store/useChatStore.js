@@ -293,8 +293,21 @@ export const useChatStore = create(
 
         try {
           const res = await axiosInstance.post(`/messages/send/${selectedUser._id}`, messageData);
-          set({ messages: [...messages, res.data], composerText: "", replyToMessage: null });
-          get().getConversations();
+          set((state) => {
+            // Optimistically add to conversations if this is the first message
+            const alreadyInConversations = state.conversations.some(
+              (c) => String(c._id) === String(selectedUser._id),
+            );
+            return {
+              messages: [...state.messages, res.data],
+              composerText: "",
+              replyToMessage: null,
+              conversations: alreadyInConversations
+                ? state.conversations
+                : [selectedUser, ...state.conversations],
+            };
+          });
+          get().getConversations(); // sync in background for ordering/cleanup
           return true;
         } catch (error) {
           toast.error(error.response?.data?.message || "Failed to send message");
@@ -303,16 +316,18 @@ export const useChatStore = create(
       },
 
       subscribeToMessages: (userId) => {
-        if (!userId) return;
-
         const socket = useAuthStore.getState().socket;
         if (!socket) return;
 
+        // Always listen for new messages to keep the conversations list fresh,
+        // even when no conversation is open (userId may be null).
         socket.off("newMessage");
         socket.on("newMessage", (newMessage) => {
           // Always refresh conversation lists so archived auto-unarchive is reflected
           get().getConversations();
           get().getArchivedConversations();
+
+          if (!userId) return; // no active conversation — only list refresh needed
 
           // Play notification sound unless this conversation is muted or global sound is off
           if (get().isSoundEnabled && !get().isConversationMuted(newMessage.senderId)) {
@@ -328,6 +343,8 @@ export const useChatStore = create(
           // Mark as read since we're actively in this conversation
           get().markMessagesAsRead(userId);
         });
+
+        if (!userId) return; // per-conversation listeners only needed with an active chat
 
         socket.off("typing");
         socket.on("typing", ({ senderId }) => {
