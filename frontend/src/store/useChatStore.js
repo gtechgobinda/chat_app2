@@ -146,6 +146,8 @@ export const useChatStore = create(
           set({ messages: res.data });
           // We're viewing this conversation — mark their messages as read
           get().markMessagesAsRead(userId);
+          // Refresh sidebar to clear the unread badge for this conversation
+          get().getConversations();
         } catch (error) {
           toast.error(error.response?.data?.message || "Failed to load messages");
         } finally {

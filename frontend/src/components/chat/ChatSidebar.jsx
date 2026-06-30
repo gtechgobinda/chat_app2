@@ -20,6 +20,7 @@ function mapUserForList(user, onlineUsers) {
     avatarUrl: user.profilePic,
     initials: getInitials(user.fullName),
     isOnline: onlineUsers.includes(user._id),
+    unreadCount: user.unreadCount ?? 0,
     peer: {
       name: user.fullName,
       avatarUrl: user.profilePic,

@@ -41,6 +41,15 @@ export function ConversationRow({ user, selected, onSelect, onArchive, onUnarchi
         </div>
       </button>
 
+      {/* Unread count badge — shares position with action icon, fades out on hover when icon present */}
+      {user.unreadCount > 0 && !selected && (
+        <span
+          className={`pointer-events-none absolute right-2.5 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-accent-foreground transition-opacity duration-150 ${actionIcon ? "group-hover:opacity-0" : ""}`}
+        >
+          {user.unreadCount > 9 ? "9+" : user.unreadCount}
+        </span>
+      )}
+
       {actionIcon && (
         <button
           type="button"

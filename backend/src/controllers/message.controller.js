@@ -27,13 +27,34 @@ export async function getConversationsForSidebar(req, res) {
         $group: {
           _id: { $cond: [{ $eq: ["$senderId", loggedInUserId] }, "$receiverId", "$senderId"] },
           lastMessageAt: { $max: "$createdAt" },
+          // Count messages sent TO the logged-in user that haven't been read yet
+          unreadCount: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ["$receiverId", loggedInUserId] },
+                    { $eq: [{ $ifNull: ["$readAt", null] }, null] },
+                    { $ne: ["$deletedForEveryone", true] },
+                    { $not: [{ $in: [loggedInUserId, { $ifNull: ["$deletedFor", []] }] }] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
         },
       },
       // Exclude archived conversation partners
       { $match: { _id: { $nin: archivedIds } } },
       { $sort: { lastMessageAt: -1 } },
       { $lookup: { from: "users", localField: "_id", foreignField: "_id", as: "user" } },
-      { $replaceRoot: { newRoot: { $first: "$user" } } },
+      {
+        $replaceRoot: {
+          newRoot: { $mergeObjects: [{ $first: "$user" }, { unreadCount: "$unreadCount" }] },
+        },
+      },
       { $project: { clerkId: 0 } },
     ]);
 
