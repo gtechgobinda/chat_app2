@@ -8,12 +8,14 @@ import { formatLastSeen } from "../../lib/utils";
 
 export function UserWithStatusRow({ user, isFriend, onOpenChat, onSendRequest }) {
   const onlineUsers = useAuthStore((state) => state.onlineUsers);
-  const isSentPending = useFriendStore((state) => state.isSentPending);
-  const isReceivedPending = useFriendStore((state) => state.isReceivedPending);
+  // Subscribe to the arrays directly so the component re-renders when they change.
+  // Subscribing to isSentPending/isReceivedPending (function refs) wouldn't trigger re-renders.
+  const sentRequests = useFriendStore((state) => state.sentRequests);
+  const receivedRequests = useFriendStore((state) => state.receivedRequests);
 
   const isOnline = onlineUsers.includes(user._id);
-  const sentPending = isSentPending(user._id);
-  const receivedRequest = isReceivedPending(user._id);
+  const sentPending = sentRequests.some((r) => String(r.receiverId?._id) === String(user._id));
+  const receivedRequest = receivedRequests.find((r) => String(r.senderId?._id) === String(user._id));
 
   return (
     <div className="flex w-full items-center gap-3 border-b border-border px-3 py-2.5">

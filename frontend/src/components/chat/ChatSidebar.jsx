@@ -119,7 +119,6 @@ function ChatSidebar() {
 
   async function handleSendRequest(userId) {
     await sendFriendRequest(userId);
-    getSentRequests();
   }
 
   return (
