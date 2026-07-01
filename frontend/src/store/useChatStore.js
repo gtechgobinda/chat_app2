@@ -5,11 +5,32 @@ import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "./useAuthStore";
 import toast from "react-hot-toast";
 
+function playNotificationTone() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(880, ctx.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.12);
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.35);
+  } catch (_) {
+    // audio not available — silent fail
+  }
+}
+
 export const useChatStore = create(
   persist(
     (set, get) => ({
       users: [],
       conversations: [],
+      archivedConversations: [],
+      mutedConversations: [], // [{ userId, mutedUntil: ISO string | null }]
       messages: [],
       selectedUser: null,
       isConversationsLoading: false,
@@ -19,22 +40,43 @@ export const useChatStore = create(
       searchQuery: "",
       sidebarTab: "chats",
       composerText: "",
+      replyToMessage: null,
       isSoundEnabled: true,
       isSendingMedia: false,
+      typingUsers: {},
+      starredMessages: [],
+      starredPanelOpen: false,
 
       getUsers: async () => {
         set({ isUsersLoading: true });
         try {
-          const res = await axiosInstance.get("/messages/users");
-          set((state) => ({
-            users: res.data,
-            selectedUser:
-              state.selectedUser && res.data.some((user) => user._id === state.selectedUser._id)
-                ? state.selectedUser
-                : null,
-          }));
-        } catch (error) {
-          console.log("Error in get Users", error.message);
+          const MAX_RETRIES = 3;
+          let lastError;
+          for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            if (attempt > 0) {
+              // 800ms, 1.6s, 2.4s — short enough that the spinner stays visible
+              await new Promise((r) => setTimeout(r, attempt * 800));
+            }
+            try {
+              const res = await axiosInstance.get("/messages/users");
+              set((state) => ({
+                users: res.data,
+                selectedUser:
+                  state.selectedUser &&
+                  res.data.some((user) => user._id === state.selectedUser._id)
+                    ? state.selectedUser
+                    : null,
+              }));
+              return; // success — finally will still run
+            } catch (error) {
+              lastError = error;
+              const isTransient =
+                !error.response ||
+                [401, 404, 500, 502, 503].includes(error.response?.status);
+              if (!isTransient) break;
+            }
+          }
+          if (lastError) console.log("Error in getUsers:", lastError.message);
         } finally {
           set({ isUsersLoading: false });
         }
@@ -52,12 +94,77 @@ export const useChatStore = create(
         }
       },
 
+      getArchivedConversations: async () => {
+        try {
+          const res = await axiosInstance.get("/messages/archived");
+          set({ archivedConversations: res.data });
+        } catch (error) {
+          console.log("Error in getArchivedConversations", error.message);
+        }
+      },
+
+      archiveConversation: async (userId) => {
+        try {
+          await axiosInstance.post(`/messages/archive/${userId}`);
+          await Promise.all([get().getConversations(), get().getArchivedConversations()]);
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to archive conversation");
+        }
+      },
+
+      unarchiveConversation: async (userId) => {
+        try {
+          await axiosInstance.delete(`/messages/archive/${userId}`);
+          await Promise.all([get().getConversations(), get().getArchivedConversations()]);
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to unarchive conversation");
+        }
+      },
+
+      getMutedConversations: async () => {
+        try {
+          const res = await axiosInstance.get("/messages/muted");
+          set({ mutedConversations: res.data });
+        } catch (error) {
+          console.log("Error in getMutedConversations", error.message);
+        }
+      },
+
+      muteConversation: async (userId, duration) => {
+        try {
+          await axiosInstance.post(`/messages/mute/${userId}`, { duration });
+          await get().getMutedConversations();
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to mute conversation");
+        }
+      },
+
+      unmuteConversation: async (userId) => {
+        try {
+          await axiosInstance.delete(`/messages/mute/${userId}`);
+          await get().getMutedConversations();
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to unmute conversation");
+        }
+      },
+
+      isConversationMuted: (userId) => {
+        const entry = get().mutedConversations.find((m) => String(m.userId) === String(userId));
+        if (!entry) return false;
+        if (entry.mutedUntil === null) return true;
+        return new Date(entry.mutedUntil) > new Date();
+      },
+
       getMessages: async (userId) => {
         if (!userId) return;
         set({ isMessagesLoading: true });
         try {
           const res = await axiosInstance.get(`/messages/${userId}`);
           set({ messages: res.data });
+          // We're viewing this conversation — mark their messages as read
+          get().markMessagesAsRead(userId);
+          // Refresh sidebar to clear the unread badge for this conversation
+          get().getConversations();
         } catch (error) {
           toast.error(error.response?.data?.message || "Failed to load messages");
         } finally {
@@ -65,14 +172,161 @@ export const useChatStore = create(
         }
       },
 
+      reactToMessage: async (messageId, emoji) => {
+        try {
+          const res = await axiosInstance.post(`/messages/${messageId}/reaction`, { emoji });
+          set((state) => ({
+            messages: state.messages.map((m) =>
+              String(m._id) === String(messageId) ? { ...m, reactions: res.data.reactions } : m,
+            ),
+          }));
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to add reaction");
+        }
+      },
+
+      pinMessage: async (messageId) => {
+        try {
+          await axiosInstance.post(`/messages/${messageId}/pin`);
+          set((state) => ({
+            messages: state.messages.map((m) => ({
+              ...m,
+              isPinned: String(m._id) === String(messageId),
+            })),
+          }));
+          return true;
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to pin message");
+          return false;
+        }
+      },
+
+      unpinMessage: async (messageId) => {
+        try {
+          await axiosInstance.delete(`/messages/${messageId}/pin`);
+          set((state) => ({
+            messages: state.messages.map((m) =>
+              String(m._id) === String(messageId) ? { ...m, isPinned: false } : m,
+            ),
+          }));
+          return true;
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to unpin message");
+          return false;
+        }
+      },
+
+      deleteMessage: async (messageId, scope) => {
+        try {
+          await axiosInstance.delete(`/messages/${messageId}`, { data: { scope } });
+          if (scope === "everyone") {
+            set((state) => ({
+              messages: state.messages.map((m) =>
+                String(m._id) === String(messageId)
+                  ? { ...m, deletedForEveryone: true, text: null, image: null, video: null }
+                  : m,
+              ),
+            }));
+          } else {
+            set((state) => ({
+              messages: state.messages.filter((m) => String(m._id) !== String(messageId)),
+            }));
+          }
+          return true;
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to delete message");
+          return false;
+        }
+      },
+
+      editMessage: async (messageId, newText) => {
+        try {
+          const res = await axiosInstance.patch(`/messages/${messageId}`, { text: newText });
+          set((state) => ({
+            messages: state.messages.map((m) =>
+              String(m._id) === String(messageId)
+                ? { ...m, text: res.data.text, editedAt: res.data.editedAt }
+                : m,
+            ),
+          }));
+          return true;
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to edit message");
+          return false;
+        }
+      },
+
+      getStarredMessages: async () => {
+        try {
+          const res = await axiosInstance.get("/messages/starred");
+          set({ starredMessages: res.data });
+        } catch (error) {
+          console.log("Error in getStarredMessages", error.message);
+        }
+      },
+
+      starMessage: async (messageId) => {
+        try {
+          await axiosInstance.post(`/messages/${messageId}/star`);
+          await get().getStarredMessages();
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to star message");
+        }
+      },
+
+      unstarMessage: async (messageId) => {
+        try {
+          await axiosInstance.delete(`/messages/${messageId}/star`);
+          set((state) => ({
+            starredMessages: state.starredMessages.filter(
+              (m) => String(m._id) !== String(messageId),
+            ),
+          }));
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to unstar message");
+        }
+      },
+
+      setStarredPanelOpen: (open) => set({ starredPanelOpen: open }),
+
+      setReplyTo: (message) => set({ replyToMessage: message }),
+      clearReplyTo: () => set({ replyToMessage: null }),
+
       sendMessage: async (messageData) => {
-        const { selectedUser, messages } = get();
+        const { selectedUser, messages, replyToMessage } = get();
         if (!selectedUser) return false;
+
+        if (replyToMessage) {
+          const replyPayload = {
+            messageId: replyToMessage.id,
+            senderName: replyToMessage.senderName,
+            text: replyToMessage.text || "",
+            imageUrl: replyToMessage.imageUrl || null,
+          };
+          if (messageData instanceof FormData) {
+            messageData.append("replyTo", JSON.stringify(replyPayload));
+          } else {
+            messageData.replyTo = replyPayload;
+          }
+        }
 
         try {
           const res = await axiosInstance.post(`/messages/send/${selectedUser._id}`, messageData);
-          set({ messages: [...messages, res.data], composerText: "" });
-          get().getConversations();
+          set((state) => {
+            // Optimistically add to conversations if this is the first message
+            const alreadyInConversations = state.conversations.some(
+              (c) => String(c._id) === String(selectedUser._id),
+            );
+            return {
+              messages: [...state.messages, res.data],
+              composerText: "",
+              replyToMessage: null,
+              conversations: alreadyInConversations
+                ? state.conversations
+                : [selectedUser, ...state.conversations],
+            };
+          });
+          get().getConversations(); // sync in background for ordering/cleanup
           return true;
         } catch (error) {
           toast.error(error.response?.data?.message || "Failed to send message");
@@ -81,25 +335,147 @@ export const useChatStore = create(
       },
 
       subscribeToMessages: (userId) => {
-        if (!userId) return;
-
         const socket = useAuthStore.getState().socket;
         if (!socket) return;
 
+        // Always listen for new messages to keep the conversations list fresh,
+        // even when no conversation is open (userId may be null).
         socket.off("newMessage");
         socket.on("newMessage", (newMessage) => {
+          // Always refresh conversation lists so archived auto-unarchive is reflected
+          get().getConversations();
+          get().getArchivedConversations();
+
+          if (!userId) return; // no active conversation — only list refresh needed
+
+          // Play notification sound unless this conversation is muted or global sound is off
+          if (get().isSoundEnabled && !get().isConversationMuted(newMessage.senderId)) {
+            playNotificationTone();
+          }
+
           // if im not the receiver don't do anything just return
           if (String(newMessage.senderId) !== String(userId)) return;
 
           set({ messages: [...get().messages, newMessage] });
+          // clear typing when message arrives
+          set((state) => ({ typingUsers: { ...state.typingUsers, [userId]: false } }));
+          // Mark as read since we're actively in this conversation
+          get().markMessagesAsRead(userId);
+        });
 
-          get().getConversations();
+        if (!userId) return; // per-conversation listeners only needed with an active chat
+
+        socket.off("typing");
+        socket.on("typing", ({ senderId }) => {
+          console.log("[typing received]", { senderId, expectedUserId: userId, match: String(senderId) === String(userId) });
+          if (String(senderId) !== String(userId)) return;
+          set((state) => ({ typingUsers: { ...state.typingUsers, [senderId]: true } }));
+          console.log("[typingUsers updated]", get().typingUsers);
+        });
+
+        socket.off("stopTyping");
+        socket.on("stopTyping", ({ senderId }) => {
+          if (String(senderId) !== String(userId)) return;
+          set((state) => ({ typingUsers: { ...state.typingUsers, [senderId]: false } }));
+        });
+
+        socket.off("messageDelivered");
+        socket.on("messageDelivered", ({ messageId, deliveredAt }) => {
+          set((state) => ({
+            messages: state.messages.map((msg) =>
+              String(msg._id) === String(messageId) ? { ...msg, deliveredAt } : msg,
+            ),
+          }));
+        });
+
+        socket.off("messagesRead");
+        socket.on("messagesRead", ({ at }) => {
+          const authUserId = useAuthStore.getState().authUser?._id;
+          set((state) => ({
+            messages: state.messages.map((msg) =>
+              String(msg.senderId) === String(authUserId) && !msg.readAt
+                ? { ...msg, readAt: at }
+                : msg,
+            ),
+          }));
+        });
+
+        socket.off("messageEdited");
+        socket.on("messageEdited", ({ messageId, text, editedAt }) => {
+          set((state) => ({
+            messages: state.messages.map((m) =>
+              String(m._id) === String(messageId) ? { ...m, text, editedAt } : m,
+            ),
+          }));
+        });
+
+        socket.off("messageDeleted");
+        socket.on("messageDeleted", ({ messageId }) => {
+          set((state) => ({
+            messages: state.messages.map((m) =>
+              String(m._id) === String(messageId)
+                ? { ...m, deletedForEveryone: true, text: null, image: null, video: null }
+                : m,
+            ),
+          }));
+        });
+
+        socket.off("messagePinned");
+        socket.on("messagePinned", ({ messageId }) => {
+          set((state) => ({
+            messages: state.messages.map((m) => ({
+              ...m,
+              isPinned: String(m._id) === String(messageId),
+            })),
+          }));
+        });
+
+        socket.off("messageUnpinned");
+        socket.on("messageUnpinned", ({ messageId }) => {
+          set((state) => ({
+            messages: state.messages.map((m) =>
+              String(m._id) === String(messageId) ? { ...m, isPinned: false } : m,
+            ),
+          }));
+        });
+
+        socket.off("messageReaction");
+        socket.on("messageReaction", ({ messageId, reactions }) => {
+          set((state) => ({
+            messages: state.messages.map((m) =>
+              String(m._id) === String(messageId) ? { ...m, reactions } : m,
+            ),
+          }));
         });
       },
 
       unsubscribeFromMessages: () => {
         const socket = useAuthStore.getState().socket;
         socket?.off("newMessage");
+        socket?.off("typing");
+        socket?.off("stopTyping");
+        socket?.off("messageDelivered");
+        socket?.off("messagesRead");
+        socket?.off("messageEdited");
+        socket?.off("messageDeleted");
+        socket?.off("messagePinned");
+        socket?.off("messageUnpinned");
+        socket?.off("messageReaction");
+      },
+
+      markMessagesAsRead: (senderId) => {
+        const socket = useAuthStore.getState().socket;
+        socket?.emit("markMessagesRead", { senderId });
+      },
+
+      sendTypingEvent: (receiverId) => {
+        const socket = useAuthStore.getState().socket;
+        socket?.emit("typing", { receiverId });
+      },
+
+      sendStopTypingEvent: (receiverId) => {
+        const socket = useAuthStore.getState().socket;
+        socket?.emit("stopTyping", { receiverId });
       },
 
       setSelectedUser: (selectedUser) => set({ selectedUser }),

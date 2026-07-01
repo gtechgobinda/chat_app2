@@ -13,17 +13,32 @@ export const useAuthStore = create((set, get) => ({
   checkAuth: async () => {
     set({ isCheckingAuth: true });
 
-    try {
-      const res = await axiosInstance.get("/auth/check");
-      set({ authUser: res.data });
+    // Retry up to 5 times if the user profile isn't synced yet (webhook delay on first login).
+    // PageLoader stays visible during retries so the user never sees a broken empty state.
+    const MAX_ATTEMPTS = 5;
+    let lastError;
 
-      get().connectSocket(res.data);
-    } catch (error) {
-      console.error("Error in checkAuth:", error);
-      set({ authUser: null });
-    } finally {
-      set({ isCheckingAuth: false });
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        const res = await axiosInstance.get("/auth/check");
+        set({ authUser: res.data });
+        get().connectSocket(res.data);
+        set({ isCheckingAuth: false });
+        return;
+      } catch (error) {
+        lastError = error;
+        const notSyncedYet = error.response?.status === 404;
+        if (notSyncedYet && attempt < MAX_ATTEMPTS) {
+          // Wait 1s × attempt before next retry (1s, 2s, 3s, 4s)
+          await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+          continue;
+        }
+        break;
+      }
     }
+
+    console.error("Error in checkAuth:", lastError);
+    set({ authUser: null, isCheckingAuth: false });
   },
 
   clearAuth: () => {

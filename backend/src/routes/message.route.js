@@ -1,9 +1,23 @@
 import express from "express";
 import {
   getConversationsForSidebar,
+  getArchivedConversations,
+  archiveConversation,
+  unarchiveConversation,
+  getMutedConversations,
+  muteConversation,
+  unmuteConversation,
   getMessages,
+  editMessage,
+  deleteMessage,
+  reactToMessage,
+  pinMessage,
+  unpinMessage,
   getUsersForSidebar,
   sendMessage,
+  getStarredMessages,
+  starMessage,
+  unstarMessage,
 } from "../controllers/message.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 import { upload } from "../middleware/upload.middleware.js";
@@ -14,7 +28,21 @@ router.use(protectRoute);
 
 router.get("/users", getUsersForSidebar);
 router.get("/conversations", getConversationsForSidebar);
+router.get("/archived", getArchivedConversations);
+router.post("/archive/:id", archiveConversation);
+router.delete("/archive/:id", unarchiveConversation);
+router.get("/muted", getMutedConversations);
+router.post("/mute/:id", muteConversation);
+router.delete("/mute/:id", unmuteConversation);
+router.get("/starred", getStarredMessages);
+router.post("/:id/star", starMessage);
+router.delete("/:id/star", unstarMessage);
 router.get("/:id", getMessages);
+router.patch("/:id", editMessage);
+router.delete("/:id", deleteMessage);
+router.post("/:id/reaction", reactToMessage);
+router.post("/:id/pin", pinMessage);
+router.delete("/:id/pin", unpinMessage);
 router.post("/send/:id", upload.single("media"), sendMessage);
 
 export default router;

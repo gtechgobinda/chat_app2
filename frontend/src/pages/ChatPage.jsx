@@ -1,35 +1,63 @@
 import { useWallpaper } from "../context/wallpaper";
 import { useChatStore } from "../store/useChatStore";
 import { useSelectedConversation } from "../hooks/useSelectedConversation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import ChatSidebar from "../components/chat/ChatSidebar";
 import { ChatHeader } from "../components/chat/ChatHeader";
 import { MessageList } from "../components/chat/MessageList";
 import { ChatComposer } from "../components/chat/ChatComposer";
+import { StarredMessagesPanel } from "../components/chat/StarredMessagesPanel";
 
 function ChatPage() {
   const { frameStyle } = useWallpaper();
 
   const getConversations = useChatStore((state) => state.getConversations);
+  const getArchivedConversations = useChatStore((state) => state.getArchivedConversations);
+  const getMutedConversations = useChatStore((state) => state.getMutedConversations);
   const getMessages = useChatStore((state) => state.getMessages);
   const getUsers = useChatStore((state) => state.getUsers);
+  const users = useChatStore((state) => state.users);
+  const isUsersLoading = useChatStore((state) => state.isUsersLoading);
   const subscribeToMessages = useChatStore((state) => state.subscribeToMessages);
   const unsubscribeFromMessages = useChatStore((state) => state.unsubscribeFromMessages);
+  const getStarredMessages = useChatStore((state) => state.getStarredMessages);
 
   const { activeConversation, activeConversationId, isLargeScreen } = useSelectedConversation();
 
   useEffect(() => {
     getUsers();
     getConversations();
-  }, [getConversations, getUsers]);
+    getArchivedConversations();
+    getMutedConversations();
+    getStarredMessages();
+  }, [getConversations, getArchivedConversations, getMutedConversations, getUsers, getStarredMessages]);
+
+  // Safety-net: if users list is still empty after the initial load completes (e.g. another
+  // user's Clerk webhook fires after our first getUsers() call), retry a few times.
+  // loadedOnce prevents the effect from firing before the initial getUsers() even starts,
+  // which was causing retryRef to increment on the very first render (wrong timing).
+  const loadedOnce = useRef(false);
+  const retryRef = useRef(0);
+  useEffect(() => {
+    if (isUsersLoading) { loadedOnce.current = true; return; }
+    if (!loadedOnce.current) return; // initial load hasn't started yet
+    if (users.length > 0) { retryRef.current = 0; return; }
+    if (retryRef.current >= 3) return;
+    retryRef.current += 1;
+    const delay = retryRef.current * 1500; // 1.5s, 3s, 4.5s
+    const timer = setTimeout(getUsers, delay);
+    return () => clearTimeout(timer);
+  }, [users, isUsersLoading, getUsers]);
 
   useEffect(() => {
-    if (!activeConversationId) return;
+    // Subscribe even without an active conversation so incoming messages
+    // always refresh the conversations list (fixes "first message needs refresh" bug).
+    subscribeToMessages(activeConversationId ?? null);
 
-    getMessages(activeConversationId);
-    subscribeToMessages(activeConversationId);
+    if (activeConversationId) {
+      getMessages(activeConversationId);
+    }
 
-    // cleanup
     return () => unsubscribeFromMessages();
   }, [getMessages, activeConversationId, subscribeToMessages, unsubscribeFromMessages]);
 
@@ -39,14 +67,14 @@ function ChatPage() {
         <ChatSidebar />
 
         <div
-          className={`flex-1 flex-col overflow-hidden ${
+          className={`relative flex-1 flex-col overflow-hidden ${
             !isLargeScreen && !activeConversationId ? "hidden lg:flex" : "flex"
           }`}
         >
           <ChatHeader />
           <MessageList />
-
           {activeConversation ? <ChatComposer /> : null}
+          <StarredMessagesPanel />
         </div>
       </div>
     </div>
